@@ -7,6 +7,7 @@ import json
 from rest_framework.response import Response
 from myApp.serializers import UserSerializer, GroupSerializer
 from .models import *
+from django.views.decorators.csrf import csrf_exempt
 
 
 # Create your views here.
@@ -26,83 +27,81 @@ class GroupViewSet(viewsets.ModelViewSet):
     serializer_class = GroupSerializer
 
 
+@csrf_exempt
 def login(request):
     context = {
+        'code': 403,
         'log_status': 0,
-        'user_id': -1
+        'user_id': -1,
+        'success': False,
+        'result': '登录请求失败'
     }
-    # request.META["CSRF_COOKIE_USED"] = True
-    reqUsername = request.data['username']
-    reqPassword = request.data['password']
-    try:
-        student = Student.objects.filter(name=reqUsername, password=reqPassword)
-        if student is not None:
-            request.session['IS_LOGIN'] = True
-            request.session['USER_Id'] = student[0].id
-            context['log_status'] = 1
-            context['user_id'] = student[0].id
-            return Response({"code": 200, "result": "登录成功"})
-        else:
-            return Response({"code": 403, "result": "密码错误"})
-    except ObjectDoesNotExist:
-        return Response({"code": 404, "result": "账号不存在"})
-
-
-# # done
-# def login(request):
-#     context = {
-#         'log_status': 0,
-#         'user_id': -1
-#     }
-#
-#     if request.method == 'POST':
-#         name = request.POST.get('name')
-#         password = request.POST.get('password')
-#         print(name, password)
-#         user = Student.objects.filter(name=name, password=password)
-#         if user:
-#             request.session['IS_LOGIN'] = True
-#             request.session['USER_Id'] = user[0].id
-#             context['log_status'] = 1
-#             context['user_id'] = user[0].id
-#             return HttpResponse(json.dumps(context), content_type="application/json")
-#         else:
-#             return HttpResponse(json.dumps(context), content_type="application/json")
-
-
-# done
-def register(request):
+    print(request.POST)
     if request.method == 'POST':
-        name = request.POST.get('name')
-        pwd = request.POST.get('password')
-        address = request.POST.get('address')
-        birthday = request.POST.get('birthday')
-        nickname = request.POST.get('nickname')
-        gender = request.POST.get('gender')
-        phone = request.POST.get('phone')
+        # request.META["CSRF_COOKIE_USED"] = True
+        reqBody = eval(request.body.decode())
+        reqUsername = reqBody.get('name')
+        reqPassword = reqBody.get('password')
         try:
-            student = Student.objects.filter(name=name, password=pwd)
-            context = {'re_true': 'false', 'code': 403, 'result': ''}
+            student = Student.objects.filter(name=reqUsername, password=reqPassword)
+            if len(student) != 0:
+                request.session['IS_LOGIN'] = True
+                request.session['USER_Id'] = student[0].id
+                context['code'] = 200
+                context['log_status'] = 1
+                context['user_id'] = student[0].id
+                context['success'] = True
+                context['result'] = '登录成功'
+                return HttpResponse(json.dumps(context), content_type="application/json")
+            else:
+                context['code'] = 403
+                context['result'] = '用户名或密码错误'
+                return HttpResponse(json.dumps(context), content_type="application/json")
+        except ObjectDoesNotExist:
+            context['code'] = 404
+            context['result'] = '账号不存在'
+            return HttpResponse(json.dumps(context), content_type="application/json")
+    else:
+        context = {
+            'code': 405,
+            'log_status': 0,
+            'user_id': -1,
+            'success': False,
+            'result': '请使用POST请求'
+        }
+        return HttpResponse(json.dumps(context), content_type="application/json")
+
+
+@csrf_exempt
+def register(request):
+    context = {'success': False, 'code': 403, 'result': ''}
+    if request.method == 'POST':
+        reqBody = eval(request.body.decode())
+        name = reqBody.get('name')
+        pwd = reqBody.get('password')
+        print(name)
+        try:
+            student = Student.objects.filter(name=name)
             if name and pwd and not student:
                 u = Student(name=name,
-                            password=pwd,
-                            address=address,
-                            birthday=birthday,
-                            nickname=nickname,
-                            gender=gender,
-                            phone=phone)
+                            password=pwd)
                 u.save()
-                context['re_true'] = 'true'
+                context['success'] = True
                 context['code'] = 200
                 context['result'] = '注册成功'
                 return HttpResponse(json.dumps(context), content_type="application/json")
             else:
-                context['re_true'] = 'false'
+                context['success'] = False
                 context['code'] = 403
                 context['result'] = '用户名已被注册'
                 return HttpResponse(json.dumps(context), content_type="application/json")
         except ObjectDoesNotExist:
-            context['re_true'] = 'false'
+            context['success'] = False
             context['code'] = 404
             context['result'] = '错误'
             return HttpResponse(json.dumps(context), content_type="application/json")
+    else:
+        context['success'] = False
+        context['code'] = 405
+        context['result'] = '必须使用POST请求'
+        return HttpResponse(json.dumps(context), content_type="application/json")
