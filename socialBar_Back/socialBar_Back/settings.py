@@ -98,6 +98,21 @@ DATABASES = {
     }
 }
 
+# 邮件配置
+EMAIL_USE_SSL = True
+
+EMAIL_HOST = 'smtp.qq.com'  # 如果是 163 改成 smtp.163.com
+
+EMAIL_PORT = 465
+
+EMAIL_HOST_USER = "2234148120@qq.com"  # 帐号
+
+EMAIL_HOST_PASSWORD = "kerrpdbybpsddjda"  # 授权码（****）
+
+EMAIL_FROM = "2234148120@qq.com"
+
+# 默认邮件
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 # Password validation
 # https://docs.djangoproject.com/en/2.2/ref/settings/#auth-password-validators
@@ -121,7 +136,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/2.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'zh-hans'
 
 TIME_ZONE = 'Asia/Shanghai'
 
@@ -129,7 +144,7 @@ USE_I18N = True
 
 USE_L10N = True
 
-USE_TZ = True
+USE_TZ = False
 
 
 # Static files (CSS, JavaScript, Images)

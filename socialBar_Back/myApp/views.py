@@ -1,13 +1,16 @@
 from django.http import HttpResponse
 from django.shortcuts import render
+from django.core import serializers
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth.models import User, Group
 from rest_framework import viewsets
 import json
+from datetime import datetime
 from rest_framework.response import Response
 from myApp.serializers import UserSerializer, GroupSerializer
 from .models import *
 from django.views.decorators.csrf import csrf_exempt
+from .email_util import *
 
 
 # Create your views here.
@@ -77,19 +80,35 @@ def register(request):
     context = {'success': False, 'code': 403, 'result': ''}
     if request.method == 'POST':
         reqBody = eval(request.body.decode())
-        name = reqBody.get('name')
-        pwd = reqBody.get('password')
-        print(name)
+        email = reqBody.get('email')
+        code = reqBody.get('code')
         try:
-            student = Student.objects.filter(name=name)
-            if name and pwd and not student:
-                u = Student(name=name,
-                            password=pwd)
-                u.save()
-                context['success'] = True
-                context['code'] = 200
-                context['result'] = '注册成功'
-                return HttpResponse(json.dumps(context), content_type="application/json")
+            student = Student.objects.filter(email=email)
+            if email and not student:
+                mObj = EmailVerifyRecord.objects.filter(email=email).order_by('-id').first()
+                # conx = serializers.serialize("json", mObj)
+                print(mObj.id)
+                print(mObj.send_time)
+                tCode = mObj.code
+                sec = (datetime.datetime.now() - mObj.send_time).seconds
+                if sec > 120:
+                    context['success'] = False
+                    context['code'] = 201
+                    context['result'] = '验证码时间超时，请重新获取'
+                    return HttpResponse(json.dumps(context), content_type="application/json")
+                else:
+                    if code != tCode:
+                        context['success'] = False
+                        context['code'] = 202
+                        context['result'] = '验证码错误，请重新输入'
+                        return HttpResponse(json.dumps(context), content_type="application/json")
+                    # context['obj'] = mObj
+                    u = Student(email=email)
+                    u.save()
+                    context['success'] = True
+                    context['code'] = 200
+                    context['result'] = '注册成功'
+                    return HttpResponse(json.dumps(context), content_type="application/json")
             else:
                 context['success'] = False
                 context['code'] = 403
@@ -104,4 +123,48 @@ def register(request):
         context['success'] = False
         context['code'] = 405
         context['result'] = '必须使用POST请求'
+        return HttpResponse(json.dumps(context), content_type="application/json")
+
+
+# 注册发送邮箱验证码
+def sendEmailRegisterCodeView(request):
+    if request.method == 'POST':
+        context = {
+            'code': "200", 'email': "", 'error_email': '', 'success': True
+        }
+        # print(eval(request.body.decode()))
+        print(request.body)
+        try:
+            reqBody = eval(request.body.decode())
+            print(reqBody)
+            email = reqBody.get('email')
+            context['email'] = email
+            user_obj = Student.objects.filter(email=email).first()
+            if user_obj:
+                context['code'] = "111"
+                context['error_email'] = "用户已存在"
+                context['success'] = False
+                return HttpResponse(json.dumps(context), content_type="application/json")
+            else:
+                # 发送邮箱
+                res_email = send_code_email(email)
+                if res_email:
+                    # 注册用户信息，设置登陆状态为False
+                    # create_last_user = Student.objects.update_or_create(email=email)
+                    # if not create_last_user:
+                    #     context['code'] = "201"
+                    #     context['error_email'] = "注册错误，请重试"
+                    #     context['success'] = False
+                    #     return HttpResponse(json.dumps(context), content_type="application/json")
+                    return HttpResponse(json.dumps(context), content_type="application/json")
+                else:
+                    context['code'] = "202"
+                    context['error_email'] = "验证码发送失败, 请稍后重试"
+                    context['success'] = False
+                    return HttpResponse(json.dumps(context), content_type="application/json")
+        except Exception as e:
+            print("错误信息 : ", e)
+            context['code'] = "404"
+            context['error_email'] = "接口错误, 请稍后重试"
+            context['success'] = False
         return HttpResponse(json.dumps(context), content_type="application/json")
