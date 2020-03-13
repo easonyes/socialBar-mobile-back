@@ -43,22 +43,33 @@ def login(request):
     if request.method == 'POST':
         # request.META["CSRF_COOKIE_USED"] = True
         reqBody = eval(request.body.decode())
-        reqUsername = reqBody.get('name')
+        reqUsername = reqBody.get('email')
         reqPassword = reqBody.get('password')
         try:
-            student = Student.objects.filter(name=reqUsername, password=reqPassword)
-            if len(student) != 0:
-                request.session['IS_LOGIN'] = True
-                request.session['USER_Id'] = student[0].id
-                context['code'] = 200
-                context['log_status'] = 1
-                context['user_id'] = student[0].id
-                context['success'] = True
-                context['result'] = '登录成功'
-                return HttpResponse(json.dumps(context), content_type="application/json")
+            student = Student.objects.filter(email=reqUsername).first()
+            if student:
+                if student.password == reqPassword:
+                    request.session['IS_LOGIN'] = True
+                    request.session['USER_Id'] = student.id
+                    context['code'] = 200
+                    context['log_status'] = 1
+                    context['user_id'] = student.id
+                    context['success'] = True
+                    context['result'] = '登录成功'
+                    return HttpResponse(json.dumps(context), content_type="application/json")
+                elif student.password == "123":
+                    context['code'] = 201
+                    context['result'] = '该账号密码尚未设置，请使用验证码登录并前往个人界面设置密码'
+                    context['success'] = False
+                    return HttpResponse(json.dumps(context), content_type="application/json")
+                else:
+                    context['code'] = 201
+                    context['result'] = '密码错误'
+                    context['success'] = False
+                    return HttpResponse(json.dumps(context), content_type="application/json")
             else:
-                context['code'] = 403
-                context['result'] = '用户名或密码错误'
+                context['code'] = 202
+                context['result'] = '用户不存在'
                 return HttpResponse(json.dumps(context), content_type="application/json")
         except ObjectDoesNotExist:
             context['code'] = 404
@@ -76,49 +87,168 @@ def login(request):
 
 
 @csrf_exempt
-def register(request):
+def emailValidate(request):
     context = {'success': False, 'code': 403, 'result': ''}
     if request.method == 'POST':
         reqBody = eval(request.body.decode())
         email = reqBody.get('email')
         code = reqBody.get('code')
+        # 获取验证码类型，1代表注册，2代表忘记密码，3代表登录
+        eType = reqBody.get('type')
         try:
             student = Student.objects.filter(email=email)
-            if email and not student:
+            if eType == "1":
+                if email and not student:
+                    mObj = EmailVerifyRecord.objects.filter(email=email).order_by('-id').first()
+                    # conx = serializers.serialize("json", mObj)
+                    print(mObj.id)
+                    print(mObj.send_time)
+                    tCode = mObj.code
+                    sec = (datetime.datetime.now() - mObj.send_time).seconds
+                    if sec > 120:
+                        context['success'] = False
+                        context['code'] = 201
+                        context['result'] = '验证码时间超时，请重新获取'
+                        return HttpResponse(json.dumps(context), content_type="application/json")
+                    else:
+                        if code != tCode:
+                            context['success'] = False
+                            context['code'] = 202
+                            context['result'] = '验证码错误，请重新输入'
+                            return HttpResponse(json.dumps(context), content_type="application/json")
+                        # context['obj'] = mObj
+                        # u = Student(email=email)
+                        # u.save()
+                        context['success'] = True
+                        context['code'] = 200
+                        context['result'] = '验证成功'
+                        return HttpResponse(json.dumps(context), content_type="application/json")
+                else:
+                    context['success'] = False
+                    context['code'] = 203
+                    context['result'] = '邮箱已被注册'
+                    return HttpResponse(json.dumps(context), content_type="application/json")
+            elif eType == "2" or eType == "3":
                 mObj = EmailVerifyRecord.objects.filter(email=email).order_by('-id').first()
-                # conx = serializers.serialize("json", mObj)
-                print(mObj.id)
-                print(mObj.send_time)
                 tCode = mObj.code
                 sec = (datetime.datetime.now() - mObj.send_time).seconds
                 if sec > 120:
                     context['success'] = False
-                    context['code'] = 201
+                    context['code'] = 205
                     context['result'] = '验证码时间超时，请重新获取'
                     return HttpResponse(json.dumps(context), content_type="application/json")
-                else:
+                if student:
                     if code != tCode:
                         context['success'] = False
-                        context['code'] = 202
+                        context['code'] = 206
                         context['result'] = '验证码错误，请重新输入'
                         return HttpResponse(json.dumps(context), content_type="application/json")
-                    # context['obj'] = mObj
-                    u = Student(email=email)
-                    u.save()
-                    context['success'] = True
-                    context['code'] = 200
-                    context['result'] = '注册成功'
-                    return HttpResponse(json.dumps(context), content_type="application/json")
-            else:
-                context['success'] = False
-                context['code'] = 403
-                context['result'] = '用户名已被注册'
-                return HttpResponse(json.dumps(context), content_type="application/json")
+                    if eType == "2":
+                        context['success'] = True
+                        context['code'] = 200
+                        context['result'] = '验证成功'
+                        return HttpResponse(json.dumps(context), content_type="application/json")
+                    else:
+                        context['success'] = True
+                        context['code'] = 200
+                        context['result'] = '登录成功'
+                        return HttpResponse(json.dumps(context), content_type="application/json")
+                else:
+                    if eType == "3":
+                        Student.objects.create(email=email, password=123)
+                        context['success'] = True
+                        context['code'] = 200
+                        context['result'] = '邮箱还未被注册,注册并登录成功'
+                        return HttpResponse(json.dumps(context), content_type="application/json")
+                    else:
+                        context['success'] = False
+                        context['code'] = 204
+                        context['result'] = '邮箱还未被注册'
+                        return HttpResponse(json.dumps(context), content_type="application/json")
         except ObjectDoesNotExist:
             context['success'] = False
             context['code'] = 404
             context['result'] = '错误'
             return HttpResponse(json.dumps(context), content_type="application/json")
+    else:
+        context['success'] = False
+        context['code'] = 405
+        context['result'] = '必须使用POST请求'
+        return HttpResponse(json.dumps(context), content_type="application/json")
+
+
+# 设置密码（注册、更改密码、重置密码）
+def setPwd(request):
+    context = {'success': False, 'code': 403, 'result': ''}
+    if request.method == "POST":
+        try:
+            reqBody = eval(request.body.decode())
+            email = reqBody.get("email")
+            # 1代表注册，2代表更改，3代表重置
+            pType = reqBody.get("type")
+            code = reqBody.get("code")
+            pwd = reqBody.get("password")
+            nPwd = reqBody.get("newPassword")
+            student = Student.objects.filter(email=email).first()
+            print(student.password)
+            if pType == "2":
+                if student:
+                    if pwd == student.password:
+                        student.password = nPwd
+                        context['code'] = "200"
+                        context['error_email'] = "修改密码成功"
+                        context['success'] = True
+                        return HttpResponse(json.dumps(context), content_type="application/json")
+                    else:
+                        context['code'] = "205"
+                        context['error_email'] = "原密码验证错误，请重试"
+                        context['success'] = False
+                        return HttpResponse(json.dumps(context), content_type="application/json")
+                else:
+                    context['code'] = "202"
+                    context['error_email'] = "找不到该邮箱的用户信息"
+                    context['success'] = True
+                    return HttpResponse(json.dumps(context), content_type="application/json")
+            else:
+                eObj = EmailVerifyRecord.objects.filter(email=email, code=code).order_by("-id").first()
+                sec = (datetime.datetime.now() - eObj.send_time).seconds
+                if sec > 720:
+                    context['code'] = "210"
+                    context['error_email'] = "验证码已失效，请重新验证"
+                    context['success'] = False
+                    return HttpResponse(json.dumps(context), content_type="application/json")
+                if pType == "1":
+                    if student:
+                        context['code'] = "201"
+                        context['error_email'] = "该邮箱已注册"
+                        context['success'] = False
+                        return HttpResponse(json.dumps(context), content_type="application/json")
+                    else:
+                        Student.objects.create(
+                            email=email,
+                            password=pwd
+                        )
+                        context['code'] = "200"
+                        context['error_email'] = "注册成功"
+                        context['success'] = True
+                        return HttpResponse(json.dumps(context), content_type="application/json")
+                else:
+                    if student:
+                        student.password = pwd
+                        context['code'] = "200"
+                        context['error_email'] = "修改密码成功"
+                        context['success'] = True
+                        return HttpResponse(json.dumps(context), content_type="application/json")
+                    else:
+                        context['code'] = "202"
+                        context['error_email'] = "找不到该邮箱的用户信息"
+                        context['success'] = True
+                        return HttpResponse(json.dumps(context), content_type="application/json")
+        except Exception as e:
+            print("错误信息 : ", e)
+            context['code'] = "404"
+            context['error_email'] = "接口错误, 请稍后重试"
+            context['success'] = False
     else:
         context['success'] = False
         context['code'] = 405
@@ -139,29 +269,29 @@ def sendEmailRegisterCodeView(request):
             print(reqBody)
             email = reqBody.get('email')
             context['email'] = email
-            user_obj = Student.objects.filter(email=email).first()
-            if user_obj:
-                context['code'] = "111"
-                context['error_email'] = "用户已存在"
-                context['success'] = False
+            # user_obj = Student.objects.filter(email=email).first()
+            # if user_obj:
+            #     context['code'] = "111"
+            #     context['error_email'] = "用户已存在"
+            #     context['success'] = False
+            #     return HttpResponse(json.dumps(context), content_type="application/json")
+            # else:
+            # 发送邮箱
+            res_email = send_code_email(email)
+            if res_email:
+                # 注册用户信息，设置登陆状态为False
+                # create_last_user = Student.objects.update_or_create(email=email)
+                # if not create_last_user:
+                #     context['code'] = "201"
+                #     context['error_email'] = "注册错误，请重试"
+                #     context['success'] = False
+                #     return HttpResponse(json.dumps(context), content_type="application/json")
                 return HttpResponse(json.dumps(context), content_type="application/json")
             else:
-                # 发送邮箱
-                res_email = send_code_email(email)
-                if res_email:
-                    # 注册用户信息，设置登陆状态为False
-                    # create_last_user = Student.objects.update_or_create(email=email)
-                    # if not create_last_user:
-                    #     context['code'] = "201"
-                    #     context['error_email'] = "注册错误，请重试"
-                    #     context['success'] = False
-                    #     return HttpResponse(json.dumps(context), content_type="application/json")
-                    return HttpResponse(json.dumps(context), content_type="application/json")
-                else:
-                    context['code'] = "202"
-                    context['error_email'] = "验证码发送失败, 请稍后重试"
-                    context['success'] = False
-                    return HttpResponse(json.dumps(context), content_type="application/json")
+                context['code'] = "202"
+                context['error_email'] = "验证码发送失败, 请稍后重试"
+                context['success'] = False
+                return HttpResponse(json.dumps(context), content_type="application/json")
         except Exception as e:
             print("错误信息 : ", e)
             context['code'] = "404"
