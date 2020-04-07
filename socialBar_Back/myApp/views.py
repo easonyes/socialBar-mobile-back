@@ -41,6 +41,18 @@ def login(request):
     }
     print(request.POST)
     if request.method == 'POST':
+        sId = request.get_signed_cookie('login_id', default=None, salt='id')
+        print(sId)
+        if sId:
+            student = Student.objects.filter(id=sId).first()
+            context['log_status'] = 1
+            context['code'] = 200
+            context['user_id'] = student.id
+            context['success'] = True
+            context['result'] = '使用cookie自动登录成功'
+            response = HttpResponse(json.dumps(context), content_type="application/json")
+            response.set_signed_cookie('login_id', student.id, salt="id", max_age=60 * 60 * 24 * 7)
+            return response
         # request.META["CSRF_COOKIE_USED"] = True
         reqBody = eval(request.body.decode())
         reqUsername = reqBody.get('email')
@@ -56,7 +68,9 @@ def login(request):
                     context['user_id'] = student.id
                     context['success'] = True
                     context['result'] = '登录成功'
-                    return HttpResponse(json.dumps(context), content_type="application/json")
+                    response = HttpResponse(json.dumps(context), content_type="application/json")
+                    response.set_signed_cookie('login_id', student.id, salt="id", max_age=60*60*24*7)
+                    return response
                 elif student.password == "123":
                     context['code'] = 201
                     context['result'] = '该账号密码尚未设置，请使用验证码登录并前往个人界面设置密码'
@@ -130,6 +144,11 @@ def emailValidate(request):
                     return HttpResponse(json.dumps(context), content_type="application/json")
             elif eType == "2" or eType == "3":
                 mObj = EmailVerifyRecord.objects.filter(email=email).order_by('-id').first()
+                if not mObj:
+                    context['success'] = False
+                    context['code'] = 210
+                    context['result'] = '请先获取验证码！'
+                    return HttpResponse(json.dumps(context), content_type="application/json")
                 tCode = mObj.code
                 sec = (datetime.datetime.now() - mObj.send_time).seconds
                 if sec > 120:
@@ -152,14 +171,18 @@ def emailValidate(request):
                         context['success'] = True
                         context['code'] = 200
                         context['result'] = '登录成功'
-                        return HttpResponse(json.dumps(context), content_type="application/json")
+                        response = HttpResponse(json.dumps(context), content_type="application/json")
+                        response.set_signed_cookie('login_id', student.id, salt="id", max_age=60*60*24*7)
+                        return response
                 else:
                     if eType == "3":
                         Student.objects.create(email=email, password=123)
                         context['success'] = True
                         context['code'] = 200
                         context['result'] = '邮箱还未被注册,注册并登录成功'
-                        return HttpResponse(json.dumps(context), content_type="application/json")
+                        response = HttpResponse(json.dumps(context), content_type="application/json")
+                        response.set_signed_cookie('login_id', student.id, salt="id", max_age=60*60*24*7)
+                        return response
                     else:
                         context['success'] = False
                         context['code'] = 204
@@ -189,8 +212,8 @@ def setPwd(request):
             code = reqBody.get("code")
             pwd = reqBody.get("password")
             nPwd = reqBody.get("newPassword")
+            print(nPwd)
             student = Student.objects.filter(email=email).first()
-            print(student.password)
             if pType == "2":
                 if student:
                     if pwd == student.password:
@@ -226,7 +249,7 @@ def setPwd(request):
                     else:
                         Student.objects.create(
                             email=email,
-                            password=pwd
+                            password=nPwd
                         )
                         context['code'] = "200"
                         context['error_email'] = "注册成功"
@@ -234,7 +257,7 @@ def setPwd(request):
                         return HttpResponse(json.dumps(context), content_type="application/json")
                 else:
                     if student:
-                        student.password = pwd
+                        student.password = nPwd
                         context['code'] = "200"
                         context['error_email'] = "修改密码成功"
                         context['success'] = True
@@ -249,6 +272,7 @@ def setPwd(request):
             context['code'] = "404"
             context['error_email'] = "接口错误, 请稍后重试"
             context['success'] = False
+            return HttpResponse(json.dumps(context), content_type="application/json")
     else:
         context['success'] = False
         context['code'] = 405
