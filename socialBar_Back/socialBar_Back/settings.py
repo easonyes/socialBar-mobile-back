@@ -25,7 +25,7 @@ SECRET_KEY = '^sgxuh0a_m)pk)h#($80h@mxq@&0*u+d5=m1p%z^ulksoss8^9'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['127.0.0.1', '192.168.1.7']
 
 
 # Application definition
@@ -64,11 +64,13 @@ CORS_ORIGIN_ALLOW_ALL = True
 
 ROOT_URLCONF = 'socialBar_Back.urls'
 
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media').replace("\\", "/")
+MEDIA_URL = '/media/'
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'templates')]
-        ,
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -145,10 +147,6 @@ USE_I18N = True
 USE_L10N = True
 
 USE_TZ = False
-
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media').replace("\\", "/")
-
-MEDIA_URL = '/media/'
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.2/howto/static-files/

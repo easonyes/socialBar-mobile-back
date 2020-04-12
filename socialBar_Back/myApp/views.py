@@ -11,6 +11,8 @@ from myApp.serializers import UserSerializer, GroupSerializer
 from .models import *
 from django.views.decorators.csrf import csrf_exempt
 from .email_util import *
+import base64
+from django.core.files.base import ContentFile
 
 
 # Create your views here.
@@ -321,4 +323,39 @@ def sendEmailRegisterCodeView(request):
             context['code'] = "404"
             context['error_email'] = "接口错误, 请稍后重试"
             context['success'] = False
+        return HttpResponse(json.dumps(context), content_type="application/json")
+
+
+# 上传图片
+def uploadAvatar(request):
+    if request.method == 'POST':
+        context = {
+            'code': 200,
+            'success': True,
+            'result': '更换头像成功'
+        }
+        response = eval(request.body.decode())
+        avatar = response.get('avatar')
+        print(request.FILES)
+        sId = request.get_signed_cookie('login_id', default=None, salt='id')
+        if not sId:
+            context['code'] = 403
+            context['success'] = False
+            context['result'] = '用户登录信息获取失败，请重新登录'
+            return HttpResponse(json.dumps(context), content_type="application/json")
+        s = Student.objects.filter(id=sId).first()
+        print(s.avatar)
+        imgData = base64.b64decode(avatar)
+        # data = ContentFile(base64.b64decode(imgData), name=sId + '.jpg')  # You can save this as file instance.
+        save_path = '%s/img/avatars/%s' % (settings.MEDIA_ROOT, sId + '.jpg')
+        with open(save_path, "wb") as f:
+            f.write(imgData)
+            f.close()
+        # file_url = 'static/upload/%s.%s' % (sId, 'jpg')
+        # leniyimg = open(file_url, 'wb')
+        # leniyimg.write(imgData)
+        # leniyimg.close()
+        s.avatar = save_path
+        s.gender = 1
+        s.save()
         return HttpResponse(json.dumps(context), content_type="application/json")

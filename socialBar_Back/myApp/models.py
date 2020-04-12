@@ -23,7 +23,7 @@ class Student(models.Model):
     defaultSite = models.SmallIntegerField(verbose_name="默认站点", null=True)
     starList = models.TextField(verbose_name="关注列表", null=True)
     fansList = models.TextField(verbose_name="粉丝列表", null=True)
-    avatar = models.ImageField(verbose_name="用户头像", upload_to="img/avatars", blank=True, null=True)
+    avatar = models.FileField(verbose_name="用户头像", upload_to="img/avatars", blank=True, null=True)
 
 
 # 邮箱验证
@@ -50,9 +50,9 @@ class Certification(models.Model):
     master = models.SmallIntegerField(verbose_name="硕士大学", null=True)
     doctor = models.SmallIntegerField(verbose_name="博士大学", null=True)
     studentCard = models.SmallIntegerField(verbose_name="学生证号", null=True)
-    faceImg = models.ImageField(verbose_name="学生照片", upload_to="img/faces", blank=True, null=True)
-    idCardImg1 = models.ImageField(verbose_name="身份证正面", upload_to="img/idCardImg", blank=True, null=True)
-    idCardImg2 = models.ImageField(verbose_name="身份证反面", upload_to="img/idCardImg", blank=True, null=True)
+    faceImg = models.FileField(verbose_name="学生照片", upload_to="img/faces", blank=True, null=True)
+    idCardImg1 = models.FileField(verbose_name="身份证正面", upload_to="img/idCardImg", blank=True, null=True)
+    idCardImg2 = models.FileField(verbose_name="身份证反面", upload_to="img/idCardImg", blank=True, null=True)
     city = models.SmallIntegerField(verbose_name="当前城市")
     school = models.SmallIntegerField(verbose_name="当前学校")
 
@@ -115,6 +115,6 @@ class Chat(models.Model):
         (2, "图片"),
         (3, "文件")
     ), verbose_name="消息类型")
-    img = models.ImageField(upload_to="img/chat", blank=True, null=True, verbose_name="消息图片")
+    img = models.FileField(upload_to="img/chat", blank=True, null=True, verbose_name="消息图片")
     file = models.FileField(upload_to="file/chat", null=True, verbose_name="消息文件")
 

@@ -6,5 +6,6 @@ urlpatterns = [
     re_path(r'^login$', views.login),
     re_path(r'^emailValidate$', views.emailValidate),
     re_path(r'^sendEmail$', views.sendEmailRegisterCodeView),
-    re_path(r'^setPwd$', views.setPwd)
+    re_path(r'^setPwd$', views.setPwd),
+    re_path(r'^uploadAvatar$', views.uploadAvatar),
 ]
