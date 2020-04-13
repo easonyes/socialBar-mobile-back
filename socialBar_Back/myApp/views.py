@@ -39,19 +39,24 @@ def login(request):
         'log_status': 0,
         'user_id': -1,
         'success': False,
-        'result': '登录请求失败'
+        'result': '登录请求失败',
+        'studentInfo': None
     }
     print(request.POST)
     if request.method == 'POST':
         sId = request.get_signed_cookie('login_id', default=None, salt='id')
         print(sId)
         if sId:
-            student = Student.objects.filter(id=sId).first()
+            students = Student.objects.filter(id=sId)
+            student = students.first()
             context['log_status'] = 1
             context['code'] = 200
             context['user_id'] = student.id
             context['success'] = True
             context['result'] = '使用cookie自动登录成功'
+            # print(student)
+            # print(type(student))
+            context['studentInfo'] = serializers.serialize('json', students)
             response = HttpResponse(json.dumps(context), content_type="application/json")
             response.set_signed_cookie('login_id', student.id, salt="id", max_age=60 * 60 * 24 * 7)
             return response
@@ -60,6 +65,7 @@ def login(request):
         reqUsername = reqBody.get('email')
         reqPassword = reqBody.get('password')
         try:
+            students = Student.objects.filter(email=reqUsername)
             student = Student.objects.filter(email=reqUsername).first()
             if student:
                 if student.password == reqPassword:
@@ -70,6 +76,7 @@ def login(request):
                     context['user_id'] = student.id
                     context['success'] = True
                     context['result'] = '登录成功'
+                    context['studentInfo'] = serializers.serialize('json', students)
                     response = HttpResponse(json.dumps(context), content_type="application/json")
                     response.set_signed_cookie('login_id', student.id, salt="id", max_age=60*60*24*7)
                     return response
@@ -172,6 +179,7 @@ def emailValidate(request):
                     else:
                         context['success'] = True
                         context['code'] = 200
+                        context['studentInfo'] = serializers.serialize('json', student)
                         context['result'] = '登录成功'
                         response = HttpResponse(json.dumps(context), content_type="application/json")
                         response.set_signed_cookie('login_id', student.id, salt="id", max_age=60*60*24*7)
@@ -182,6 +190,7 @@ def emailValidate(request):
                         context['success'] = True
                         context['code'] = 200
                         context['result'] = '邮箱还未被注册,注册并登录成功'
+                        context['studentInfo'] = serializers.serialize('json', student)
                         response = HttpResponse(json.dumps(context), content_type="application/json")
                         response.set_signed_cookie('login_id', student.id, salt="id", max_age=60*60*24*7)
                         return response
@@ -332,7 +341,8 @@ def uploadAvatar(request):
         context = {
             'code': 200,
             'success': True,
-            'result': '更换头像成功'
+            'result': '更换头像成功',
+            'avatar': ''
         }
         response = eval(request.body.decode())
         avatar = response.get('avatar')
@@ -348,6 +358,7 @@ def uploadAvatar(request):
         imgData = base64.b64decode(avatar)
         # data = ContentFile(base64.b64decode(imgData), name=sId + '.jpg')  # You can save this as file instance.
         save_path = '%s/img/avatars/%s' % (settings.MEDIA_ROOT, sId + '.jpg')
+        context['avatar'] = save_path[save_path.find('/media'):]
         with open(save_path, "wb") as f:
             f.write(imgData)
             f.close()
@@ -355,7 +366,17 @@ def uploadAvatar(request):
         # leniyimg = open(file_url, 'wb')
         # leniyimg.write(imgData)
         # leniyimg.close()
-        s.avatar = save_path
+        url = settings.ALLOWED_HOSTS[0]
+        s.avatar = save_path[save_path.find('/media'):]
         s.gender = 1
         s.save()
         return HttpResponse(json.dumps(context), content_type="application/json")
+
+
+# def getAvatar(request):
+#     if request.method == 'GET':
+#         print(request.GET.get('path'))
+#         return HttpResponse(json.dumps('ok'))
+        # imagepath = os.path.join(settings.BASE_DIR, "static/resume/images/{}".format(file_name))  # 图片路径
+        # with open(imagepath, 'rb') as f:
+        #     image_data = f.read()
