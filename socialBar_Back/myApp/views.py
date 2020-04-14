@@ -262,10 +262,15 @@ def setPwd(request):
                             email=email,
                             password=nPwd
                         )
+                        students = Student.objects.filter(email=email)
+                        student = students.first()
+                        context['studentInfo'] = serializers.serialize('json', students)
                         context['code'] = "200"
                         context['error_email'] = "注册成功"
                         context['success'] = True
-                        return HttpResponse(json.dumps(context), content_type="application/json")
+                        response = HttpResponse(json.dumps(context), content_type="application/json")
+                        response.set_signed_cookie('login_id', student.id, salt="id", max_age=60 * 60 * 24 * 7)
+                        return response
                 else:
                     if student:
                         student.password = nPwd
@@ -303,6 +308,12 @@ def sendEmailRegisterCodeView(request):
             reqBody = eval(request.body.decode())
             print(reqBody)
             email = reqBody.get('email')
+            validStu = Certification.objects.filter(email=email)
+            if not validStu:
+                context['code'] = 203
+                context['success'] = False
+                context['error_email'] = "很遗憾，您的学校暂未与本APP合作，但我们会尽快与贵校合作，请关注官网咨询。"
+                return HttpResponse(json.dumps(context), content_type="application/json")
             context['email'] = email
             # user_obj = Student.objects.filter(email=email).first()
             # if user_obj:
@@ -373,10 +384,32 @@ def uploadAvatar(request):
         return HttpResponse(json.dumps(context), content_type="application/json")
 
 
-# def getAvatar(request):
-#     if request.method == 'GET':
-#         print(request.GET.get('path'))
-#         return HttpResponse(json.dumps('ok'))
-        # imagepath = os.path.join(settings.BASE_DIR, "static/resume/images/{}".format(file_name))  # 图片路径
-        # with open(imagepath, 'rb') as f:
-        #     image_data = f.read()
+def verify(request):
+    if request.method == 'POST':
+        context = {
+            'code': 200,
+            'success': True,
+            'result': '实名认证成功'
+        }
+        sId = request.get_signed_cookie('login_id', default=None, salt='id')
+        if not sId:
+            context['code'] = 403
+            context['success'] = False
+            context['result'] = '用户登录信息获取失败，请重新登录'
+            return HttpResponse(json.dumps(context), content_type="application/json")
+        response = eval(request.body.decode())
+        student = Student.objects.filter(id=sId).first()
+        email = student.email
+        idCard = response.get('idCard')
+        realId = Certification.objects.filter(email=email).first().idCard
+        if idCard == realId:
+            student.status = 1
+            student.save()
+            return HttpResponse(json.dumps(context), content_type="application/json")
+        else:
+            context['code'] = 203
+            context['success'] = False
+            context['result'] = '身份证错误，实名认证失败'
+            return HttpResponse(json.dumps(context), content_type="application/json")
+    else:
+        return HttpResponse(json.dumps('请使用post'), content_type="application/json")

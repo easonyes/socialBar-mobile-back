@@ -15,15 +15,22 @@ class Student(models.Model):
     phone = models.CharField(max_length=200, null=True, verbose_name="电话")
     siteList = models.CharField(max_length=200, null=True, verbose_name="站点", help_text="表示当前用户的可用站点")
     status = models.SmallIntegerField(verbose_name="用户状态", choices=(
-        (1, "可用"),
-        (2, "锁定"),
+        (1, "已认证"),
+        (2, "未认证"),
+        (3, "锁定"),
         (0, "注销")
-    ), default=1)
+    ), default=2)
     currentSchool = models.CharField(max_length=20, null=True, verbose_name="当前学校名称")
+    currentEducation = models.SmallIntegerField(verbose_name="当前学历", default=2, choices=(
+        (1, "专科"),
+        (2, "本科"),
+        (3, "硕士"),
+        (4, "博士")
+    ))
     defaultSite = models.SmallIntegerField(verbose_name="默认站点", null=True)
     starList = models.TextField(verbose_name="关注列表", null=True)
     fansList = models.TextField(verbose_name="粉丝列表", null=True)
-    avatar = models.FileField(verbose_name="用户头像", upload_to="img/avatars", blank=True, null=True)
+    avatar = models.FileField(verbose_name="用户头像", upload_to="img/avatars", default="/media/img/avatars/default.jpg")
 
 
 # 邮箱验证
@@ -49,17 +56,18 @@ class Certification(models.Model):
     undergraduate = models.SmallIntegerField(verbose_name="本科大学", null=True)
     master = models.SmallIntegerField(verbose_name="硕士大学", null=True)
     doctor = models.SmallIntegerField(verbose_name="博士大学", null=True)
-    studentCard = models.SmallIntegerField(verbose_name="学生证号", null=True)
+    studentCard = models.CharField(verbose_name="学生证号", max_length=50, null=True)
     faceImg = models.FileField(verbose_name="学生照片", upload_to="img/faces", blank=True, null=True)
     idCardImg1 = models.FileField(verbose_name="身份证正面", upload_to="img/idCardImg", blank=True, null=True)
     idCardImg2 = models.FileField(verbose_name="身份证反面", upload_to="img/idCardImg", blank=True, null=True)
     city = models.SmallIntegerField(verbose_name="当前城市")
     school = models.SmallIntegerField(verbose_name="当前学校")
+    email = models.CharField(verbose_name="学生邮箱", max_length=200, default="com")
 
 
 class Site(models.Model):
     id = models.SmallIntegerField(verbose_name="站点id", primary_key=True)
-    siteName = models.SmallIntegerField(verbose_name="站点名称")
+    siteName = models.CharField(verbose_name="站点名称", max_length=200, help_text="站点名，比如某市或某学校")
 
 
 class Post(models.Model):
