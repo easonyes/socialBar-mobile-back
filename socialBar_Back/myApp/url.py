@@ -9,4 +9,5 @@ urlpatterns = [
     re_path(r'^setPwd$', views.setPwd),
     re_path(r'^uploadAvatar$', views.uploadAvatar),
     re_path(r'^verify$', views.verify),
+    re_path(r'^postDynamic$', views.postDynamic),
 ]

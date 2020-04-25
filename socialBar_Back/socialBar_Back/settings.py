@@ -39,8 +39,22 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'myApp',
+    'chat',
+    'channels',
     'rest_framework_swagger'
 ]
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("localhost", 6379)],
+        },
+    },
+}
+
+# 指定ASGI的路由地址
+ASGI_APPLICATION = 'socialBar_Back.routing.application'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (

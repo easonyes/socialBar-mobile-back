@@ -1,6 +1,6 @@
 from django.db import models
 from datetime import datetime
-
+from django.core.validators import validate_comma_separated_integer_list
 # Create your models here.
 
 
@@ -13,7 +13,8 @@ class Student(models.Model):
     nickname = models.CharField(max_length=200, null=True, verbose_name="昵称")
     gender = models.IntegerField(null=True, help_text="1表示男性，2表示女性", verbose_name="性别")
     phone = models.CharField(max_length=200, null=True, verbose_name="电话")
-    siteList = models.CharField(max_length=200, null=True, verbose_name="站点", help_text="表示当前用户的可用站点")
+    siteList = models.CharField(max_length=200, verbose_name="站点", help_text="表示当前用户的可用站点",
+                                default='[{"siteName":"主站","id":1}]')
     status = models.SmallIntegerField(verbose_name="用户状态", choices=(
         (1, "已认证"),
         (2, "未认证"),
@@ -27,7 +28,7 @@ class Student(models.Model):
         (3, "硕士"),
         (4, "博士")
     ))
-    defaultSite = models.SmallIntegerField(verbose_name="默认站点", null=True)
+    defaultSite = models.SmallIntegerField(verbose_name="默认站点", default=1)
     starList = models.TextField(verbose_name="关注列表", null=True)
     fansList = models.TextField(verbose_name="粉丝列表", null=True)
     avatar = models.FileField(verbose_name="用户头像", upload_to="img/avatars", default="/media/img/avatars/default.jpg")
@@ -48,6 +49,7 @@ class EmailVerifyRecord(models.Model):
         return '{0}({1})'.format(self.code, self.email)
 
 
+# 实名认证
 class Certification(models.Model):
     idCard = models.CharField(verbose_name="身份证号", max_length=18)
     name = models.CharField(verbose_name="姓名", max_length=20)
@@ -65,11 +67,13 @@ class Certification(models.Model):
     email = models.CharField(verbose_name="学生邮箱", max_length=200, default="com")
 
 
+# 站点对应表
 class Site(models.Model):
     id = models.SmallIntegerField(verbose_name="站点id", primary_key=True)
     siteName = models.CharField(verbose_name="站点名称", max_length=200, help_text="站点名，比如某市或某学校")
 
 
+# 动态表
 class Post(models.Model):
     userId = models.ForeignKey(Student, on_delete=models.CASCADE, verbose_name="学生id")
     userName = models.CharField(max_length=200, verbose_name="用户昵称")
@@ -84,12 +88,14 @@ class Post(models.Model):
     imgs = models.TextField(verbose_name="图片")
 
 
+# 浏览历史表
 class History(models.Model):
     userId = models.ForeignKey(Student, on_delete=models.CASCADE, verbose_name="学生id")
     postId = models.ForeignKey(Post, on_delete=models.CASCADE, verbose_name="动态id")
     viewTime = models.DateField(verbose_name="浏览时间")
 
 
+# 互动表
 class Interactive(models.Model):
     userId = models.ForeignKey(Student, on_delete=models.CASCADE, verbose_name="学生id")
     postId = models.ForeignKey(Post, on_delete=models.CASCADE, verbose_name="动态id")
@@ -101,6 +107,7 @@ class Interactive(models.Model):
     activeTime = models.DateField(verbose_name="互动时间")
 
 
+# 评论表
 class Comment(models.Model):
     formUser = models.ForeignKey(Student, on_delete=models.CASCADE, verbose_name="评论用户id", related_name="fromUser")
     toUser = models.ForeignKey(Student, on_delete=models.CASCADE, verbose_name="回复用户id", null=True, related_name="toUser")
@@ -114,6 +121,7 @@ class Comment(models.Model):
     toComment = models.IntegerField(verbose_name="评论id", null=True)
 
 
+# 聊天表
 class Chat(models.Model):
     fromStudent = models.ForeignKey(Student, on_delete=models.CASCADE, verbose_name="发送学生id", related_name="fromStudent")
     toStudent = models.ForeignKey(Student, on_delete=models.CASCADE, verbose_name="接收学生id", related_name="toStudent")

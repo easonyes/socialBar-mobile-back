@@ -12,6 +12,7 @@ from .models import *
 from django.views.decorators.csrf import csrf_exempt
 from .email_util import *
 import base64
+from django.forms.models import model_to_dict
 from django.core.files.base import ContentFile
 
 
@@ -30,6 +31,21 @@ class UserViewSet(viewsets.ModelViewSet):
 class GroupViewSet(viewsets.ModelViewSet):
     queryset = Group.objects.all()
     serializer_class = GroupSerializer
+
+
+def userVerified(request):
+    res = {
+        'success': False,
+        'result': '获取用户登录信息失败，请重新登录',
+        'code': 403
+    }
+    sId = request.get_signed_cookie('login_id', default=None, salt='id')
+    if not sId:
+        return HttpResponse(json.dumps(res), content_type="application/json")
+    student = Student.objects.filter(id=sId).first()
+    if student.status != 1:
+        res['result'] = '用户还未实名认证，完成实名认证解锁更多操作哦！'
+        return HttpResponse(json.dumps(res), content_type="application/json")
 
 
 @csrf_exempt
@@ -57,6 +73,7 @@ def login(request):
             # print(student)
             # print(type(student))
             context['studentInfo'] = serializers.serialize('json', students)
+            # print(context['studentInfo'])
             response = HttpResponse(json.dumps(context), content_type="application/json")
             response.set_signed_cookie('login_id', student.id, salt="id", max_age=60 * 60 * 24 * 7)
             return response
@@ -182,7 +199,7 @@ def emailValidate(request):
                         context['studentInfo'] = serializers.serialize('json', student)
                         context['result'] = '登录成功'
                         response = HttpResponse(json.dumps(context), content_type="application/json")
-                        response.set_signed_cookie('login_id', student.id, salt="id", max_age=60*60*24*7)
+                        response.set_signed_cookie('login_id', student.first().id, salt="id", max_age=60*60*24*7)
                         return response
                 else:
                     if eType == "3":
@@ -192,7 +209,7 @@ def emailValidate(request):
                         context['result'] = '邮箱还未被注册,注册并登录成功'
                         context['studentInfo'] = serializers.serialize('json', student)
                         response = HttpResponse(json.dumps(context), content_type="application/json")
-                        response.set_signed_cookie('login_id', student.id, salt="id", max_age=60*60*24*7)
+                        response.set_signed_cookie('login_id', student.first().id, salt="id", max_age=60*60*24*7)
                         return response
                     else:
                         context['success'] = False
@@ -346,9 +363,10 @@ def sendEmailRegisterCodeView(request):
         return HttpResponse(json.dumps(context), content_type="application/json")
 
 
-# 上传图片
+# 更换头像
 def uploadAvatar(request):
     if request.method == 'POST':
+        userVerified(request)
         context = {
             'code': 200,
             'success': True,
@@ -384,6 +402,7 @@ def uploadAvatar(request):
         return HttpResponse(json.dumps(context), content_type="application/json")
 
 
+# 实名认证
 def verify(request):
     if request.method == 'POST':
         context = {
@@ -401,10 +420,45 @@ def verify(request):
         student = Student.objects.filter(id=sId).first()
         email = student.email
         idCard = response.get('idCard')
-        realId = Certification.objects.filter(email=email).first().idCard
+        s = Certification.objects.filter(email=email).first()
+        realId = s.idCard
         if idCard == realId:
             student.status = 1
+            student.currentSchool = Site.objects.filter(id=s.school).first().siteName
+            siteList = []
+            sList = []
+            if s.doctor:
+                student.currentEducation = 4
+                doc = model_to_dict(Site.objects.filter(id=s.doctor).first())
+                siteList.append(doc)
+                sList.append(doc['id'])
+            elif s.master:
+                student.currentEducation = 3
+            elif s.undergraduate:
+                student.currentEducation = 2
+            else:
+                student.currentEducation = 1
+            if s.master:
+                mas = model_to_dict(Site.objects.filter(id=s.master).first())
+                if mas['id'] not in sList:
+                    sList.append(mas['id'])
+                    siteList.append(mas)
+            if s.undergraduate:
+                und = model_to_dict(Site.objects.filter(id=s.undergraduate).first())
+                if und['id'] not in sList:
+                    sList.append(und['id'])
+                    siteList.append(und)
+            if s.specialist:
+                spe = model_to_dict(Site.objects.filter(id=s.specialist).first())
+                if spe['id'] not in sList:
+                    siteList.append(spe)
+            siteList.append(model_to_dict(Site.objects.filter(id=s.fromPlace).first()))
+            if s.city != s.fromPlace:
+                siteList.append(model_to_dict(Site.objects.filter(id=s.city).first()))
+            siteList.insert(0, {'id': 1, 'siteName': '主站'})
+            student.siteList = siteList
             student.save()
+            print(student.siteList)
             return HttpResponse(json.dumps(context), content_type="application/json")
         else:
             context['code'] = 203
@@ -413,3 +467,9 @@ def verify(request):
             return HttpResponse(json.dumps(context), content_type="application/json")
     else:
         return HttpResponse(json.dumps('请使用post'), content_type="application/json")
+
+
+# 发表动态
+def postDynamic(request):
+    if request.method == 'POST':
+        return HttpResponse('ojbk')
