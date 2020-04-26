@@ -203,11 +203,13 @@ def emailValidate(request):
                         return response
                 else:
                     if eType == "3":
-                        Student.objects.create(email=email, password=123)
+                        s = Student.objects.create(email=email, password=123)
+                        s.nickname = '用户_' + str(student.first().id)
+                        s.save()
                         context['success'] = True
                         context['code'] = 200
                         context['result'] = '邮箱还未被注册,注册并登录成功'
-                        context['studentInfo'] = serializers.serialize('json', student)
+                        context['studentInfo'] = serializers.serialize('json', Student.objects.filter(email=email))
                         response = HttpResponse(json.dumps(context), content_type="application/json")
                         response.set_signed_cookie('login_id', student.first().id, salt="id", max_age=60*60*24*7)
                         return response
@@ -281,6 +283,8 @@ def setPwd(request):
                         )
                         students = Student.objects.filter(email=email)
                         student = students.first()
+                        student.nickname = '用户_' + str(student.id)
+                        student.save()
                         context['studentInfo'] = serializers.serialize('json', students)
                         context['code'] = "200"
                         context['error_email'] = "注册成功"
@@ -469,7 +473,39 @@ def verify(request):
         return HttpResponse(json.dumps('请使用post'), content_type="application/json")
 
 
+# 更新用户信息
+def updateStu(request):
+    userVerified(request)
+    context = {
+        'code': 200,
+        'success': True,
+        'result': '信息更新成功'
+    }
+    if request.method == 'POST':
+        # 如果 type == 1 则是更改昵称，否则为更新信息
+        response = eval(request.body.decode())
+        upType = response.get('type')
+        print(response)
+        if upType == 1:
+            name = response.get('name')
+            if Student.objects.filter(nickname=name):
+                context['code'] = 201
+                context['success'] = False
+                context['result'] = '所选昵称与其他用户重复'
+                return HttpResponse(json.dumps(context), content_type="application/json")
+            else:
+                sId = request.get_signed_cookie('login_id', default=None, salt='id')
+                student = Student.objects.filter(id=sId).first()
+                student.nickname = name
+                student.save()
+                context['result'] = '昵称更新成功'
+                return HttpResponse(json.dumps(context), content_type="application/json")
+        elif upType == 2:
+            return HttpResponse(json.dumps(context), content_type="application/json")
+
+
 # 发表动态
 def postDynamic(request):
+    userVerified(request)
     if request.method == 'POST':
         return HttpResponse('ojbk')
