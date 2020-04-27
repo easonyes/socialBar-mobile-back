@@ -11,4 +11,5 @@ urlpatterns = [
     re_path(r'^verify$', views.verify),
     re_path(r'^postDynamic$', views.postDynamic),
     re_path(r'^updateStu$', views.updateStu),
+    re_path(r'^getUserInfo$', views.getUserInfo),
 ]

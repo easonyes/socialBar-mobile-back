@@ -11,7 +11,12 @@ class Student(models.Model):
     address = models.CharField(max_length=200, null=True, verbose_name="地址")
     birthday = models.DateTimeField(null=True, verbose_name="生日")
     nickname = models.CharField(max_length=200, null=True, verbose_name="昵称")
-    gender = models.IntegerField(null=True, help_text="1表示男性，2表示女性", verbose_name="性别")
+    age = models.IntegerField(null=True, verbose_name="年龄")
+    gender = models.IntegerField(help_text="1表示男性，2表示女性, 0表示不展示性别", verbose_name="性别", choices=(
+        (1, "男性"),
+        (2, "女性"),
+        (0, "不展示")
+    ), default=0)
     phone = models.CharField(max_length=200, null=True, verbose_name="电话")
     siteList = models.CharField(max_length=200, verbose_name="站点", help_text="表示当前用户的可用站点",
                                 default='[{"siteName":"主站","id":1}]')

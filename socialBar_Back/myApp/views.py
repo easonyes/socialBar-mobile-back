@@ -501,7 +501,35 @@ def updateStu(request):
                 context['result'] = '昵称更新成功'
                 return HttpResponse(json.dumps(context), content_type="application/json")
         elif upType == 2:
+            sId = request.get_signed_cookie('login_id', default=None, salt='id')
+            student = Student.objects.filter(id=sId).first()
+            birthday = response.get('birthday')
+            if birthday:
+                age = response.get('age')
+                student.age = age
+                student.birthday = birthday
+            gender = response.get('gender')
+            student.gender = gender
+            student.save()
             return HttpResponse(json.dumps(context), content_type="application/json")
+
+
+# 获取用户信息
+def getUserInfo(request):
+    res = {
+        'success': False,
+        'result': '获取用户登录信息失败，请重新登录',
+        'code': 403
+    }
+    sId = request.get_signed_cookie('login_id', default=None, salt='id')
+    if not sId:
+        return HttpResponse(json.dumps(res), content_type="application/json")
+    else:
+        student = Student.objects.filter(id=sId)
+        res['result'] = serializers.serialize('json', student)
+        # print(context['studentInfo'])
+        response = HttpResponse(json.dumps(res), content_type="application/json")
+        return response
 
 
 # 发表动态
