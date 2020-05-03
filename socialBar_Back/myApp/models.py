@@ -1,5 +1,6 @@
 from django.db import models
 from datetime import datetime
+from django.utils import timezone
 from django.core.validators import validate_comma_separated_integer_list
 # Create your models here.
 
@@ -9,7 +10,7 @@ class Student(models.Model):
     password = models.CharField(max_length=200, verbose_name="密码")
     name = models.CharField(max_length=200, null=True, verbose_name="登录名")
     address = models.CharField(max_length=200, null=True, verbose_name="地址")
-    birthday = models.DateTimeField(null=True, verbose_name="生日")
+    birthday = models.CharField(max_length=50, null=True, verbose_name="生日")
     nickname = models.CharField(max_length=200, null=True, verbose_name="昵称")
     age = models.IntegerField(null=True, verbose_name="年龄")
     gender = models.IntegerField(help_text="1表示男性，2表示女性, 0表示不展示性别", verbose_name="性别", choices=(
@@ -27,6 +28,7 @@ class Student(models.Model):
         (0, "注销")
     ), default=2)
     currentSchool = models.CharField(max_length=20, null=True, verbose_name="当前学校名称")
+    chatList = models.CharField(max_length=200, null=True, verbose_name="聊天列表")
     currentEducation = models.SmallIntegerField(verbose_name="当前学历", default=2, choices=(
         (1, "专科"),
         (2, "本科"),
@@ -44,7 +46,7 @@ class EmailVerifyRecord(models.Model):
     # 验证码
     code = models.CharField(max_length=20, verbose_name="验证码")
     email = models.EmailField(max_length=50, verbose_name="邮箱")
-    send_time = models.DateTimeField(verbose_name="发送时间", default=datetime.now())
+    send_time = models.DateTimeField(verbose_name="发送时间", default=timezone.now())
 
     class Meta:
         verbose_name = u"邮箱验证码"
@@ -82,15 +84,15 @@ class Site(models.Model):
 class Post(models.Model):
     userId = models.ForeignKey(Student, on_delete=models.CASCADE, verbose_name="学生id")
     userName = models.CharField(max_length=200, verbose_name="用户昵称")
-    createTime = models.DateField(verbose_name="创建时间")
-    createPlace = models.CharField(verbose_name="创建地点", max_length=50)
-    introduction = models.CharField(verbose_name="简介", max_length=50)
+    createTime = models.DateField(verbose_name="创建时间", default=timezone.now())
+    createPlace = models.CharField(verbose_name="创建地点", max_length=50, null=True)
+    introduction = models.CharField(verbose_name="简介", max_length=50, null=True)
     content = models.TextField(verbose_name="内容")
-    tags = models.CharField(verbose_name="标签", max_length=200)
-    likes = models.IntegerField(verbose_name="点赞数")
-    comments = models.IntegerField(verbose_name="评论数")
-    forwards = models.IntegerField(verbose_name="转发数")
-    imgs = models.TextField(verbose_name="图片")
+    tags = models.CharField(verbose_name="标签", max_length=200, null=True)
+    likes = models.IntegerField(verbose_name="点赞数", default=0)
+    comments = models.IntegerField(verbose_name="评论数", default=0)
+    forwards = models.IntegerField(verbose_name="转发数", default=0)
+    imgs = models.TextField(verbose_name="图片", null=True)
 
 
 # 浏览历史表

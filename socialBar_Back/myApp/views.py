@@ -1,4 +1,4 @@
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.core import serializers
 from django.core.exceptions import ObjectDoesNotExist
@@ -14,6 +14,9 @@ from .email_util import *
 import base64
 from django.forms.models import model_to_dict
 from django.core.files.base import ContentFile
+from django.utils import timezone
+import os
+import re
 
 
 # Create your views here.
@@ -379,6 +382,7 @@ def uploadAvatar(request):
         }
         response = eval(request.body.decode())
         avatar = response.get('avatar')
+        print(avatar)
         print(request.FILES)
         sId = request.get_signed_cookie('login_id', default=None, salt='id')
         if not sId:
@@ -519,21 +523,84 @@ def getUserInfo(request):
     res = {
         'success': False,
         'result': '获取用户登录信息失败，请重新登录',
+        'studentInfo': {},
         'code': 403
     }
     sId = request.get_signed_cookie('login_id', default=None, salt='id')
     if not sId:
         return HttpResponse(json.dumps(res), content_type="application/json")
     else:
-        student = Student.objects.filter(id=sId)
-        res['result'] = serializers.serialize('json', student)
+        student = Student.objects.filter(id=sId).first()
+
+        # res['result'] = serializers.serialize('json', student)
+        res['success'] = True
+        res['result'] = '获取用户数据成功'
+        res['code'] = 200
+        # res['studentInfo'] = model_to_dict(student)
+        # print(res)
+        res['studentInfo']['nickName'] = student.nickname
+        res['studentInfo']['birthday'] = student.birthday
+        res['studentInfo']['age'] = student.age
+        res['studentInfo']['gender'] = student.gender
         # print(context['studentInfo'])
-        response = HttpResponse(json.dumps(res), content_type="application/json")
-        return response
+        # response = HttpResponse(json.dumps(res), content_type="application/json")
+        return JsonResponse(res)
+        # return HttpResponse('ok')
+
+
+# 获取用户聊天列表
+def getChatList(request):
+    userVerified(request)
+    sId = request.get_signed_cookie('login_id', default=None, salt='id')
 
 
 # 发表动态
 def postDynamic(request):
     userVerified(request)
+    context = {
+        'success': True,
+        'result': '发布成功',
+        'code': 200
+    }
     if request.method == 'POST':
-        return HttpResponse('ojbk')
+        userId = request.get_signed_cookie('login_id', default=None, salt='id')
+        response = eval(request.body.decode())
+        userName = response.get('nickName')
+        createPlace = ""
+        if response.get('createPlace'):
+            createPlace = response.get('createPlace')
+        content = response.get('content')
+        dynamic = Post.objects.create(userId=Student.objects.filter(id=userId).first(), userName=userName,
+                                      createPlace=createPlace, content=content, imgs=[])
+        imgs = response.get('imgs')
+        if imgs:
+            i = 0
+            dir = '%s/img/dynamic/%s' % (settings.MEDIA_ROOT, dynamic.id)
+            os.makedirs(dir, mode=0o777, exist_ok=True)
+            dynamic.imgs = []
+            for img in imgs:
+                i += 1
+                imgData = base64.b64decode(re.sub('^data:image/.*;base64,', '', img['content'], 0))
+                save_path = '%s/%s' % (dir, str(i) + '.jpg')
+                with open(save_path, "wb") as f:
+                    f.write(imgData)
+                    f.close()
+                dynamic.imgs.append(save_path[save_path.find('/media'):])
+            dynamic.save()
+        print(imgs)
+        return JsonResponse(context)
+
+
+# 获取动态列表
+def postList(request):
+    context = {
+        'code': 200,
+        'result': '获取列表成功',
+        'success': True
+    }
+    if request.method == "GET":
+        pType = request.GET.get('type')
+        if pType == 3:
+
+            return JsonResponse(context)
+        return JsonResponse(context)
