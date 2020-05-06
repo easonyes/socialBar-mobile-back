@@ -84,15 +84,17 @@ class Site(models.Model):
 class Post(models.Model):
     userId = models.ForeignKey(Student, on_delete=models.CASCADE, verbose_name="学生id")
     userName = models.CharField(max_length=200, verbose_name="用户昵称")
-    createTime = models.DateField(verbose_name="创建时间", default=timezone.now())
+    createTime = models.CharField(max_length=50, verbose_name="创建时间", default=timezone.now().strftime("%Y-%m-%d %H:%M:%S"))
     createPlace = models.CharField(verbose_name="创建地点", max_length=50, null=True)
     introduction = models.CharField(verbose_name="简介", max_length=50, null=True)
     content = models.TextField(verbose_name="内容")
     tags = models.CharField(verbose_name="标签", max_length=200, null=True)
     likes = models.IntegerField(verbose_name="点赞数", default=0)
     comments = models.IntegerField(verbose_name="评论数", default=0)
+    stars = models.IntegerField(verbose_name="收藏数", default=0)
     forwards = models.IntegerField(verbose_name="转发数", default=0)
     imgs = models.TextField(verbose_name="图片", null=True)
+    site = models.IntegerField(verbose_name="发布站点", default=1)
 
 
 # 浏览历史表
@@ -108,10 +110,11 @@ class Interactive(models.Model):
     postId = models.ForeignKey(Post, on_delete=models.CASCADE, verbose_name="动态id")
     type = models.SmallIntegerField(verbose_name="互动类型", choices=(
         (1, "点赞"),
-        (2, "收藏"),
-        (3, "转发")
+        (2, "评论"),
+        (3, "收藏"),
+        (4, "转发")
     ))
-    activeTime = models.DateField(verbose_name="互动时间")
+    activeTime = models.CharField(max_length=50, verbose_name="互动时间",  default=timezone.now().strftime("%Y-%m-%d %H:%M:%S"))
 
 
 # 评论表

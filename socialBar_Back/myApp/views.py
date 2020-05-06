@@ -36,6 +36,13 @@ class GroupViewSet(viewsets.ModelViewSet):
     serializer_class = GroupSerializer
 
 
+commonRes = {
+    'code': 200,
+    'result': '操作成功',
+    'success': True
+}
+
+
 def userVerified(request):
     res = {
         'success': False,
@@ -570,8 +577,9 @@ def postDynamic(request):
         if response.get('createPlace'):
             createPlace = response.get('createPlace')
         content = response.get('content')
+        site = response.get('site')
         dynamic = Post.objects.create(userId=Student.objects.filter(id=userId).first(), userName=userName,
-                                      createPlace=createPlace, content=content, imgs=[])
+                                      createPlace=createPlace, content=content, site=site, imgs=[])
         imgs = response.get('imgs')
         if imgs:
             i = 0
@@ -591,16 +599,80 @@ def postDynamic(request):
         return JsonResponse(context)
 
 
+# 改变默认站点
+def changeSite(request):
+    context = {
+        'code': 200,
+        'result': '更换站点成功',
+        'success': True
+    }
+    if request.method == 'POST':
+        response = eval(request.body.decode())
+        site = response.get('site')
+        sId = request.get_signed_cookie('login_id', default=None, salt='id')
+        student = Student.objects.filter(id=sId).first()
+        student.defaultSite = site
+        student.save()
+        return JsonResponse(context)
+
+
 # 获取动态列表
 def postList(request):
     context = {
         'code': 200,
         'result': '获取列表成功',
+        'postList': [],
         'success': True
     }
     if request.method == "GET":
+        userId = request.get_signed_cookie('login_id', default=None, salt='id')
         pType = request.GET.get('type')
-        if pType == 3:
-
+        site = request.GET.get('site')
+        lastId = request.GET.get('lastId')
+        if pType == '2':
+            if lastId:
+                lastId = (int(lastId))
+                posts = Post.objects.raw('SELECT * from myapp_post WHERE id < %s ORDER BY id DESC', [lastId])
+            else:
+                posts = Post.objects.filter(site=site).order_by('-id')
+            rePost = list(posts[0:10])
+            for i in range(0, len(rePost)):
+                rePost[i] = model_to_dict(rePost[i])
+                liked = list(Interactive.objects.filter(postId=rePost[i]['id'], userId=userId, type=1))
+                stared = list(Interactive.objects.filter(postId=rePost[i]['id'], userId=userId, type=3))
+                rePost[i]['liked'] = False
+                rePost[i]['stared'] = False
+                if liked:
+                    rePost[i]['liked'] = True
+                if stared:
+                    rePost[i]['stared'] = True
+                # print(rePost[i])
+                student = model_to_dict(Student.objects.filter(id=rePost[i]['userId']).first())
+                rePost[i]['avatar'] = str(student['avatar'])
+                rePost[i]['currentSchool'] = student['currentSchool']
+                rePost[i]['currentEducation'] = student['currentEducation']
+                rePost[i]['gender'] = student['gender']
+                # print(student)
+            context['postList'] = rePost
+            # print(rePost)
             return JsonResponse(context)
         return JsonResponse(context)
+
+
+# 点赞
+def like(request):
+    if request.method == 'POST':
+        req = eval(request.body.decode())
+        sId = request.get_signed_cookie('login_id', default=None, salt='id')
+        student = Student.objects.filter(id=sId).first()
+        pId = req.get('id')
+        post = Post.objects.filter(id=pId).first()
+        pType = req.get('type')
+        if pType:
+            Interactive.objects.get(userId=student, postId=post, type=1).delete()
+            post.likes -= 1
+        else:
+            Interactive.objects.create(userId=student, postId=post, type=1)
+            post.likes += 1
+        post.save()
+        return JsonResponse(commonRes)

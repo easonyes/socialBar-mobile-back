@@ -13,4 +13,6 @@ urlpatterns = [
     re_path(r'^updateStu$', views.updateStu),
     re_path(r'^getUserInfo$', views.getUserInfo),
     re_path(r'^postList$', views.postList),
+    re_path(r'^changeSite$', views.changeSite),
+    re_path(r'^like$', views.like),
 ]
