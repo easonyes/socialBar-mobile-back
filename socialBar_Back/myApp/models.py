@@ -123,12 +123,18 @@ class Comment(models.Model):
     toUser = models.ForeignKey(Student, on_delete=models.CASCADE, verbose_name="回复用户id", null=True, related_name="toUser")
     postId = models.ForeignKey(Post, on_delete=models.CASCADE, verbose_name="评论动态id")
     content = models.TextField(verbose_name="评论内容")
-    time = models.DateField(verbose_name="评论时间")
+    time = models.CharField(max_length=50, verbose_name="评论时间",  default=timezone.now().strftime("%Y-%m-%d %H:%M:%S"))
     active = models.SmallIntegerField(verbose_name="生效", choices=(
         (1, "生效"),
         (0, "失效")
-    ))
+    ), default=1)
+    type = models.SmallIntegerField(verbose_name="评论类型", choices=(
+        (1, "评论"),
+        (2, "回复")
+    ), default=1)
     toComment = models.IntegerField(verbose_name="评论id", null=True)
+    likes = models.IntegerField(verbose_name="点赞数", default=0)
+    dislikes = models.IntegerField(verbose_name="点踩数", default=0)
 
 
 # 聊天表
@@ -143,4 +149,19 @@ class Chat(models.Model):
     ), verbose_name="消息类型")
     img = models.FileField(upload_to="img/chat", blank=True, null=True, verbose_name="消息图片")
     file = models.FileField(upload_to="file/chat", null=True, verbose_name="消息文件")
+
+
+# 评论互动表
+class CommentActive(models.Model):
+    commentId = models.ForeignKey(Comment, on_delete=models.CASCADE, verbose_name="评论ID", related_name="toCom")
+    fromStudent = models.ForeignKey(Student, on_delete=models.CASCADE, verbose_name="评论用户", related_name="fromStu")
+    type = models.SmallIntegerField(choices=(
+        (1, "点赞"),
+        (2, "点踩"),
+        (3, "回复评论"),
+        (4, "回复用户")
+    ), verbose_name="互动类型")
+    toStudent = models.ForeignKey(Student, on_delete=models.CASCADE, verbose_name="回复用户", related_name="toStu", null=True)
+    content = models.CharField(max_length=200, verbose_name="回复内容", null=True)
+    time = models.CharField(max_length=50, verbose_name="评论时间",  default=timezone.now().strftime("%Y-%m-%d %H:%M:%S"))
 

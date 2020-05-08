@@ -15,4 +15,8 @@ urlpatterns = [
     re_path(r'^postList$', views.postList),
     re_path(r'^changeSite$', views.changeSite),
     re_path(r'^like$', views.like),
+    re_path(r'^getPostDetail$', views.getPostDetail),
+    re_path(r'^comment$', views.comment),
+    re_path(r'^likeComment$', views.likeComment),
+    re_path(r'^replayDetail$', views.replayDetail),
 ]

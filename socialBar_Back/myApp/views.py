@@ -38,7 +38,7 @@ class GroupViewSet(viewsets.ModelViewSet):
 
 commonRes = {
     'code': 200,
-    'result': '操作成功',
+    'result': '成功',
     'success': True
 }
 
@@ -659,7 +659,111 @@ def postList(request):
         return JsonResponse(context)
 
 
-# 点赞
+# 获取动态详情
+def getPostDetail(request):
+    userVerified(request)
+    if request.method == 'GET':
+        context = {
+            'code': 200,
+            'result': '获取动态成功',
+            'success': True,
+            'poInfo': ''
+        }
+        pId = request.GET.get('id')
+        userId = request.get_signed_cookie('login_id', default=None, salt='id')
+        po = model_to_dict(Post.objects.get(id=pId))
+        liked = list(Interactive.objects.filter(postId=po['id'], userId=userId, type=1))
+        stared = list(Interactive.objects.filter(postId=po['id'], userId=userId, type=3))
+        po['liked'] = False
+        po['stared'] = False
+        if liked:
+            po['liked'] = True
+        if stared:
+            po['stared'] = True
+        # print(rePost[i])
+        comments = list(Comment.objects.filter(postId=pId, type=1))
+        cLen = len(comments)
+        for i in range(0, cLen):
+            comments[i] = model_to_dict(comments[i])
+            student = model_to_dict(Student.objects.get(id=comments[i]['formUser']))
+            liked = CommentActive.objects.filter(commentId=comments[i]['id'], fromStudent=userId, type=1)
+            disliked = CommentActive.objects.filter(commentId=comments[i]['id'], fromStudent=userId, type=2)
+            comments[i]['liked'] = False
+            comments[i]['disliked'] = False
+            if liked:
+                comments[i]['liked'] = True
+            if disliked:
+                comments[i]['disliked'] = True
+            comments[i]['children'] = 0
+            children = list(Comment.objects.filter(toComment=comments[i]['id'], type=2))
+            if children:
+                # for j in range(0, len(children)):
+                #     children[j] = model_to_dict(children[j])
+                #     stu = model_to_dict(Student.objects.get(id=children[j]['formUser']))
+                #     children[j]['currentSchool'] = stu['currentSchool']
+                #     children[j]['nickName'] = stu['nickname']
+                #     children[j]['avatar'] = str(stu['avatar'])
+                #     children[j]['currentEducation'] = stu['currentEducation']
+                #     children[j]['gender'] = stu['gender']
+                #     print(children[j])
+                comments[i]['children'] = len(children)
+            comments[i]['avatar'] = str(student['avatar'])
+            comments[i]['nickName'] = student['nickname']
+            comments[i]['currentSchool'] = student['currentSchool']
+            comments[i]['currentEducation'] = student['currentEducation']
+            comments[i]['gender'] = student['gender']
+        student = model_to_dict(Student.objects.filter(id=po['userId']).first())
+        po['avatar'] = str(student['avatar'])
+        po['currentSchool'] = student['currentSchool']
+        po['currentEducation'] = student['currentEducation']
+        po['gender'] = student['gender']
+        po['pComments'] = comments
+        context['poInfo'] = po
+        return JsonResponse(context)
+
+
+# 获取回复详情
+def replayDetail(request):
+    if request.method == 'GET':
+        context = {
+            'code': 200,
+            'result': '获取回复成功',
+            'success': True,
+            'replayList': []
+        }
+        pId = request.GET.get('id')
+        toComment = request.GET.get('toComment')
+        userId = request.get_signed_cookie('login_id', default=None, salt='id')
+        lastId = request.GET.get('lastId')
+        if lastId:
+            replays = list(Comment.objects.raw('SELECT * from myapp_comment WHERE id > %s ORDER BY id', [lastId]))
+        else:
+            replays = list(Comment.objects.filter(toComment=toComment, postId=pId))
+        replayList = replays[0:10]
+        for j in range(0, len(replayList)):
+            replayList[j] = model_to_dict(replayList[j])
+            stu = model_to_dict(Student.objects.get(id=replayList[j]['formUser']))
+            liked = CommentActive.objects.filter(commentId=replayList[j]['id'], fromStudent=userId, type=1)
+            disliked = CommentActive.objects.filter(commentId=replayList[j]['id'], fromStudent=userId, type=2)
+            replayList[j]['liked'] = False
+            replayList[j]['disliked'] = False
+            if liked:
+                replayList[j]['liked'] = True
+            if disliked:
+                replayList[j]['disliked'] = True
+            replayList[j]['currentSchool'] = stu['currentSchool']
+            replayList[j]['nickName'] = stu['nickname']
+            replayList[j]['avatar'] = str(stu['avatar'])
+            replayList[j]['currentEducation'] = stu['currentEducation']
+            replayList[j]['gender'] = stu['gender']
+            if replayList[j]['toUser']:
+                replayList[j]['toName'] = model_to_dict(Student.objects.get(id=replayList[j]['toUser']))['nickname']
+            print(replayList[j])
+        context['replayList'] = replayList
+    return JsonResponse(context)
+
+
+# 动态点赞
 def like(request):
     if request.method == 'POST':
         req = eval(request.body.decode())
@@ -668,11 +772,75 @@ def like(request):
         pId = req.get('id')
         post = Post.objects.filter(id=pId).first()
         pType = req.get('type')
-        if pType:
+        if pType == '1':
             Interactive.objects.get(userId=student, postId=post, type=1).delete()
             post.likes -= 1
-        else:
+        elif pType == '2':
             Interactive.objects.create(userId=student, postId=post, type=1)
             post.likes += 1
+        elif pType == '3':
+            Interactive.objects.get(userId=student, postId=post, type=3).delete()
+            post.stars -= 1
+        elif pType == '4':
+            Interactive.objects.create(userId=student, postId=post, type=3)
+            post.stars += 1
         post.save()
+        return JsonResponse(commonRes)
+
+
+# 评论
+def comment(request):
+    if request.method == 'POST':
+        req = eval(request.body.decode())
+        sId = request.get_signed_cookie('login_id', default=None, salt='id')
+        pId = req.get('id')
+        po = Post.objects.get(id=pId)
+        po.comments += 1
+        po.save()
+        content = req.get('content')
+        cType = req.get('type')
+        if cType == '1':
+            Comment.objects.create(formUser=Student.objects.get(id=sId), postId=po, content=content, type=1)
+        elif cType == '2':
+            toComment = req.get('toComment')
+            toStudent = req.get('toStudent')
+            if toStudent:
+                Comment.objects.create(formUser=Student.objects.get(id=sId), toUser=Student.objects.get(id=toStudent),
+                                       toComment=toComment, postId=po, content=content, type=2)
+            else:
+                Comment.objects.create(formUser=Student.objects.get(id=sId), toComment=toComment, postId=po,
+                                       content=content, type=2)
+        return JsonResponse(commonRes)
+
+
+# 评论点赞
+def likeComment(request):
+    if request.method == "POST":
+        req = eval(request.body.decode())
+        sId = request.get_signed_cookie('login_id', default=None, salt='id')
+        cId = req.get('id')
+        com = Comment.objects.get(id=cId)
+        stu = Student.objects.get(id=sId)
+        cType = req.get('type')
+        if cType == '1':
+            comDis = CommentActive.objects.filter(commentId=com, fromStudent=stu, type=2)
+            if comDis:
+                CommentActive.objects.get(commentId=com, fromStudent=stu, type=2).delete()
+                com.dislikes -= 1
+            CommentActive.objects.create(commentId=com, fromStudent=stu, type=1)
+            com.likes += 1
+        elif cType == '2':
+            CommentActive.objects.get(commentId=com, fromStudent=stu, type=1).delete()
+            com.likes -= 1
+        elif cType == '3':
+            CommentActive.objects.create(commentId=com, fromStudent=stu, type=2)
+            comLik = CommentActive.objects.filter(commentId=com, fromStudent=stu, type=1)
+            if comLik:
+                CommentActive.objects.get(commentId=com, fromStudent=stu, type=1).delete()
+                com.likes -= 1
+            com.dislikes += 1
+        elif cType == '4':
+            CommentActive.objects.get(commentId=com, fromStudent=stu, type=2).delete()
+            com.dislikes -= 1
+        com.save()
         return JsonResponse(commonRes)
