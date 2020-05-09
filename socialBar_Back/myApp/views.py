@@ -537,22 +537,35 @@ def getUserInfo(request):
     if not sId:
         return HttpResponse(json.dumps(res), content_type="application/json")
     else:
-        student = Student.objects.filter(id=sId).first()
-
+        stuId = request.GET.get('userId')
+        if stuId:
+            student = Student.objects.get(id=stuId)
+            res['studentInfo']['postsNum'] = len(Post.objects.filter(userId=stuId))
+            loginStu = model_to_dict(Student.objects.get(id=sId))
+            res['studentInfo']['followed'] = False
+            if int(stuId) in eval(loginStu['starList']):
+                res['studentInfo']['followed'] = True
+        else:
+            student = Student.objects.filter(id=sId).first()
+            res['studentInfo']['postsNum'] = len(Post.objects.filter(userId=sId))
         # res['result'] = serializers.serialize('json', student)
         res['success'] = True
         res['result'] = '获取用户数据成功'
         res['code'] = 200
         # res['studentInfo'] = model_to_dict(student)
         # print(res)
+        res['studentInfo']['id'] = student.id
+        res['studentInfo']['avatar'] = str(student.avatar)
         res['studentInfo']['nickName'] = student.nickname
         res['studentInfo']['birthday'] = student.birthday
+        res['studentInfo']['status'] = student.status
         res['studentInfo']['age'] = student.age
+        res['studentInfo']['currentSchool'] = student.currentSchool
+        res['studentInfo']['currentEducation'] = student.currentEducation
         res['studentInfo']['gender'] = student.gender
-        # print(context['studentInfo'])
-        # response = HttpResponse(json.dumps(res), content_type="application/json")
+        res['studentInfo']['starsNum'] = len(eval(student.starList))
+        res['studentInfo']['fansNum'] = len(eval(student.fansList))
         return JsonResponse(res)
-        # return HttpResponse('ok')
 
 
 # 获取用户聊天列表
@@ -683,6 +696,11 @@ def getPostDetail(request):
         # print(rePost[i])
         comments = list(Comment.objects.filter(postId=pId, type=1))
         cLen = len(comments)
+        loginStu = model_to_dict(Student.objects.get(id=userId))
+        poStu = po['userId']
+        po['followed'] = False
+        if poStu in eval(loginStu['starList']):
+            po['followed'] = True
         for i in range(0, cLen):
             comments[i] = model_to_dict(comments[i])
             student = model_to_dict(Student.objects.get(id=comments[i]['formUser']))
@@ -844,3 +862,131 @@ def likeComment(request):
             com.dislikes -= 1
         com.save()
         return JsonResponse(commonRes)
+
+
+# 关注
+def followStu(request):
+    context = {
+        'code': 200,
+        'result': '关注成功',
+        'success': True
+    }
+    if request.method == "POST":
+        req = eval(request.body.decode())
+        userId = request.get_signed_cookie('login_id', default=None, salt='id')
+        loginStu = Student.objects.get(id=userId)
+        stuDic = model_to_dict(Student.objects.get(id=userId))
+        sId = req.get('id')
+        fStu = Student.objects.get(id=sId)
+        fanList = eval(model_to_dict(fStu)['fansList'])
+        fType = req.get('type')
+        starList = eval(stuDic['starList'])
+        if fType == '1':
+            if userId == str(sId):
+                context['code'] = 210
+                context['result'] = '不能关注自己'
+                context['success'] = False
+                return JsonResponse(context)
+            starList.append(sId)
+            loginStu.starList = starList
+            loginStu.save()
+            fanList.append(userId)
+            fStu.fansList = fanList
+            fStu.save()
+            return JsonResponse(context)
+        elif fType == '2':
+            starList.remove(sId)
+            loginStu.starList = starList
+            loginStu.save()
+            fanList.remove(userId)
+            fStu.fansList = fanList
+            fStu.save()
+            context['result'] = "取消关注成功"
+            return JsonResponse(context)
+        return JsonResponse(context)
+
+
+# 获取粉丝列表
+def getFanList(request):
+    if request.method == "GET":
+        context = {
+            'code': 200,
+            'result': '获取粉丝列表成功',
+            'success': True,
+            'fanList': []
+        }
+        userId = request.GET.get('userId')
+        fanIds = eval(model_to_dict(Student.objects.get(id=userId))['fansList'])
+        fanList = []
+        for i in fanIds:
+            stu = model_to_dict(Student.objects.get(id=i))
+            stu['avatar'] = str(stu['avatar'])
+            fanList.append(stu)
+        context['fanList'] = fanList
+        return JsonResponse(context)
+
+
+# 获取关注列表
+def getStarList(request):
+    if request.method == "GET":
+        context = {
+            'code': 200,
+            'result': '获取粉丝列表成功',
+            'success': True,
+            'starList': []
+        }
+        userId = request.GET.get('userId')
+        fanIds = eval(model_to_dict(Student.objects.get(id=userId))['starList'])
+        fanList = []
+        for i in fanIds:
+            stu = model_to_dict(Student.objects.get(id=i))
+            stu['avatar'] = str(stu['avatar'])
+            fanList.append(stu)
+        context['starList'] = fanList
+        return JsonResponse(context)
+
+
+# 获取发表动态列表
+def getPostList(request):
+    if request.method == "POST":
+        context = {
+            'code': 200,
+            'result': '获取列表成功',
+            'postList': [],
+            'success': True
+        }
+        req = eval(request.body.decode())
+        userId = req.get('userId')
+        lastId = req.get('lastId')
+        siteList = req.get('siteList')
+        inStr = ""
+        for i in siteList:
+            inStr = inStr + str(i) + ", "
+        print(inStr)
+        if lastId:
+            lastId = (int(lastId))
+            posts = Post.objects.raw('SELECT * from myapp_post WHERE userId = %s and id < %s and site in ( %s ) ORDER BY id DESC', [userId, lastId, inStr])
+            print(posts)
+        else:
+            posts = Post.objects.filter(site__in=siteList, userId=userId).order_by('-id')
+        rePost = list(posts[0:10])
+        for i in range(0, len(rePost)):
+            rePost[i] = model_to_dict(rePost[i])
+            liked = list(Interactive.objects.filter(postId=rePost[i]['id'], userId=userId, type=1))
+            stared = list(Interactive.objects.filter(postId=rePost[i]['id'], userId=userId, type=3))
+            rePost[i]['liked'] = False
+            rePost[i]['stared'] = False
+            if liked:
+                rePost[i]['liked'] = True
+            if stared:
+                rePost[i]['stared'] = True
+            # print(rePost[i])
+            student = model_to_dict(Student.objects.filter(id=rePost[i]['userId']).first())
+            rePost[i]['avatar'] = str(student['avatar'])
+            rePost[i]['currentSchool'] = student['currentSchool']
+            rePost[i]['currentEducation'] = student['currentEducation']
+            rePost[i]['gender'] = student['gender']
+            # print(student)
+        context['postList'] = rePost
+        # print(rePost)
+        return JsonResponse(context)

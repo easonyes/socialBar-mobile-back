@@ -19,4 +19,8 @@ urlpatterns = [
     re_path(r'^comment$', views.comment),
     re_path(r'^likeComment$', views.likeComment),
     re_path(r'^replayDetail$', views.replayDetail),
+    re_path(r'^followStu$', views.followStu),
+    re_path(r'^getFanList$', views.getFanList),
+    re_path(r'^getStarList$', views.getStarList),
+    re_path(r'^getPostList$', views.getPostList),
 ]

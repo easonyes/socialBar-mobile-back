@@ -36,8 +36,8 @@ class Student(models.Model):
         (4, "博士")
     ))
     defaultSite = models.SmallIntegerField(verbose_name="默认站点", default=1)
-    starList = models.TextField(verbose_name="关注列表", null=True)
-    fansList = models.TextField(verbose_name="粉丝列表", null=True)
+    starList = models.TextField(verbose_name="关注列表", default=[])
+    fansList = models.TextField(verbose_name="粉丝列表", default=[])
     avatar = models.FileField(verbose_name="用户头像", upload_to="img/avatars", default="/media/img/avatars/default.jpg")
 
 
