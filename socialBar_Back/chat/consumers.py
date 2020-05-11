@@ -3,15 +3,15 @@ import json
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from .models import *
+from myApp.models import *
 
 
 class ChatConsumer(AsyncJsonWebsocketConsumer):
     chats = dict()
 
     async def connect(self):
-
         self.group_name = self.scope['url_route']['kwargs']['group_name']
-        print(self.group_name)
+        print(self.channel_layer)
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         # 将用户添加至聊天组信息chats中
         try:
@@ -33,33 +33,35 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
 
     async def receive_json(self, message, **kwargs):
         # 收到信息时调用
-        print(message)
-        '''
         to_user = message.get('to_user')
         from_user = message.get('from_user')
         time = message.get('time')
         # 信息发送
         length = len(ChatConsumer.chats[self.group_name])
-        if length == 2:
-            # print('两个人')
+        # if length == 2:
+        print('两个人')
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                "type": "chat.message",
+                "message": message.get('message'),
+                "from_user": from_user,
+                "to_user": to_user,
+                "time": time,
+            },
+        )
+        '''
+        else:
+            # try:
+            #    user = Student.objects.get(id=from_user)
+            # except Student.DoesNotExist:
+            #    user = None
+            #q = Auth(configs.get('qiniu').get('AK'), configs.get('qiniu').get('SK'))
+            #avatar_url = q.private_download_url(user.user_image_url, expires=3600)
+            # from_username = user.username
+            print(to_user)
             await self.channel_layer.group_send(
                 self.group_name,
-                {
-                    "type": "chat.message",
-                    "message": message.get('message'),
-                    "from_user": from_user,
-                    "to_user": to_user,
-                    "time": time,
-                },
-            )
-        else:
-            try:
-                user = User.objects.get(id__exact=from_user)
-            except User.DoesNotExist:
-                user = None
-            from_username = user.username
-            await self.channel_layer.group_send(
-                to_user,
                 {
                     "type": "push.message",
                     "event": {
@@ -67,11 +69,12 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
                         'group': self.group_name,
                         'from_user': from_user,
                         'time': time,
-                        'avatar_url': avatar_url,
-                        'from_username': from_username,
+                        #'avatar_url': avatar_url,
+                        #'from_username': from_username,
                     },
                 },
             )
+        '''
 
     async def chat_message(self, event):
         # Handles the "chat.message" event when it's sent to us.
@@ -82,14 +85,14 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             "to_user": event["to_user"],
             "time": event["time"],
         })
-        '''
+
 
 # 推送consumer
 class PushConsumer(AsyncWebsocketConsumer):
 
     async def connect(self):
         self.group_name = self.scope['url_route']['kwargs']['id']
-
+        print(self.channel_layer)
         await self.channel_layer.group_add(
             self.group_name,
             self.channel_name
@@ -112,10 +115,10 @@ class PushConsumer(AsyncWebsocketConsumer):
         }))
 
 
-def push(username, event):
+def push(id, event):
     channel_layer = get_channel_layer()
     async_to_sync(channel_layer.group_send)(
-        username,
+        id,
         {
             "type": "push.message",
             "event": event

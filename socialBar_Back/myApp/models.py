@@ -147,8 +147,14 @@ class Chat(models.Model):
         (2, "图片"),
         (3, "文件")
     ), verbose_name="消息类型")
+    unread = models.BooleanField(default=True, db_index=True, verbose_name='是否未读')
     img = models.FileField(upload_to="img/chat", blank=True, null=True, verbose_name="消息图片")
     file = models.FileField(upload_to="file/chat", null=True, verbose_name="消息文件")
+
+    def mark_as_read(self):
+        if self.unread:
+            self.unread = False
+            self.save()
 
 
 # 评论互动表

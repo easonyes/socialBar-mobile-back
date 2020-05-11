@@ -17,6 +17,8 @@ from django.core.files.base import ContentFile
 from django.utils import timezone
 import os
 import re
+from asgiref.sync import async_to_sync, sync_to_async
+from channels.layers import get_channel_layer
 
 
 # Create your views here.
@@ -52,10 +54,10 @@ def userVerified(request):
     sId = request.get_signed_cookie('login_id', default=None, salt='id')
     if not sId:
         return HttpResponse(json.dumps(res), content_type="application/json")
-    student = Student.objects.filter(id=sId).first()
-    if student.status != 1:
-        res['result'] = '用户还未实名认证，完成实名认证解锁更多操作哦！'
-        return HttpResponse(json.dumps(res), content_type="application/json")
+    # student = Student.objects.filter(id=sId).first()
+    # if student.status != 1:
+    #     res['result'] = '用户还未实名认证，完成实名认证解锁更多操作哦！'
+    #     return HttpResponse(json.dumps(res), content_type="application/json")
 
 
 @csrf_exempt
@@ -990,3 +992,85 @@ def getPostList(request):
         context['postList'] = rePost
         # print(rePost)
         return JsonResponse(context)
+
+
+def chat(request):
+    if request.method == 'GET':
+        '''处理get请求，返回两用户的聊天记录'''
+        # recipient = User.objects.get(username=username)
+        # sender = request.user
+        # qs_one = Chat.objects.filter(sender=sender,recipient=recipient)  # A发送给B的信息
+        # qs_two = Chat.objects.filter(sender=recipient,recipient=sender)  # B发送给A的信息
+        # all = qs_one.union(qs_two).order_by('created_at')  # 取查到的信息内容的并集，相当于他两的聊天记录
+        return JsonResponse(commonRes)
+    else:
+        req = eval(request.body.decode())
+        content = req.get('content')
+        from_user = req.get('from_user')
+        to_user = req.get('to_user')
+        # recipient = User.objects.get(username=username)  # 消息接收者
+        # content = request.POST.get('content','')  # 消息内容
+        # sender = request.user  # 发送者
+        # msg = Chat.objects.create(sender=sender,recipient=recipient,message=content)  # 把消息存储到数据库
+        # qs_one = Chat.objects.filter(sender=sender,recipient=recipient)  # A发送给B的信息
+        # qs_two = Chat.objects.filter(sender=recipient,recipient=sender)  # B发送给A的信息
+        # all = qs_one.union(qs_two).order_by('created_at')  # 取查到的信息内容的并集，相当于他两的聊天记录
+        channel_layer = get_channel_layer()
+        # get_channel_layer()函数获得的是当前的websocket连接所对应的consumer类对象的channel_layer
+        payload = {
+            'type': 'receive',  # 这个type是有限制的，比如现在用到的就是cusumer的receive函数
+            'message': content,  # 消息内容
+            'sender': from_user,  # 发送者
+            # 'created_at': str(msg.created_at)  # 创建时间
+        }
+        group_name = to_user  # 这里用的是接收者的用户名为组名，每个用户在进入聊天框后就会自动进入以自己用户名为组名的group
+        async_to_sync(channel_layer.group_send)(group_name, payload)
+        # 上一句是将channel_layer.group_send()从异步改为同步，正常的写法是channel_layer.group_send(group_name, payload)
+        return JsonResponse(commonRes)
+
+
+# 获取发表动态列表
+def getCollectionList(request):
+    if request.method == "GET":
+        context = {
+            'code': 200,
+            'result': '获取列表成功',
+            'postList': [],
+            'success': True
+        }
+        sId = request.get_signed_cookie('login_id', default=None, salt='id')
+        lastId = request.GET.get('lastId')
+        if lastId:
+            lastId = (int(lastId))
+            cs = Interactive.objects.raw('SELECT * from myapp_interactive WHERE id < %s and userId_id = %s and type = 3 ORDER BY id DESC', [lastId, sId])
+        else:
+            cs = Interactive.objects.filter(userId=sId, type=3).order_by('-id')
+        rePost = list(cs[0:10])
+        print(rePost)
+        reList = []
+        for i in range(0, len(rePost)):
+            po = model_to_dict(rePost[i].postId)
+            print(po)
+            liked = list(Interactive.objects.filter(postId=po['id'], userId=sId, type=1))
+            stared = list(Interactive.objects.filter(postId=po['id'], userId=sId, type=3))
+            po['liked'] = False
+            po['stared'] = False
+            if liked:
+                po['liked'] = True
+            if stared:
+                po['stared'] = True
+            # print(rePost[i])
+            student = model_to_dict(rePost[i].userId)
+            po['avatar'] = str(student['avatar'])
+            po['currentSchool'] = student['currentSchool']
+            po['currentEducation'] = student['currentEducation']
+            po['gender'] = student['gender']
+            po['iId'] = rePost[i].id
+            # print(student)
+            reList.append(po)
+        context['postList'] = reList
+        # print(rePost)
+        return JsonResponse(context)
+
+
+# 搜索列表及用户

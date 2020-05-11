@@ -23,4 +23,7 @@ urlpatterns = [
     re_path(r'^getFanList$', views.getFanList),
     re_path(r'^getStarList$', views.getStarList),
     re_path(r'^getPostList$', views.getPostList),
+    re_path(r'^userVerified$', views.userVerified),
+    re_path(r'^chat$', views.chat),
+    re_path(r'^getCollectionList$', views.getCollectionList),
 ]
