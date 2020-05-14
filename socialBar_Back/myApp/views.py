@@ -587,6 +587,7 @@ def postDynamic(request):
     if request.method == 'POST':
         userId = request.get_signed_cookie('login_id', default=None, salt='id')
         response = eval(request.body.decode())
+        fanList = eval(Student.objects.get(id=userId).fansList)
         userName = response.get('nickName')
         createPlace = ""
         if response.get('createPlace'):
@@ -610,7 +611,15 @@ def postDynamic(request):
                     f.close()
                 dynamic.imgs.append(save_path[save_path.find('/media'):])
             dynamic.save()
-        print(imgs)
+        if fanList:
+            for i in fanList:
+                s = Student.objects.get(id=i)
+                siteList = eval(s.siteList)
+                for j in siteList:
+                    if j['id'] == site:
+                        s.unReadPost += 1
+                        s.save()
+                        break
         return JsonResponse(context)
 
 
@@ -647,10 +656,44 @@ def postList(request):
         if pType == '2':
             if lastId:
                 lastId = (int(lastId))
-                posts = Post.objects.raw('SELECT * from myapp_post WHERE id < %s ORDER BY id DESC', [lastId])
+                posts = Post.objects.raw('SELECT * from myapp_post WHERE site = %s and id < %s ORDER BY id DESC', [site, lastId])
             else:
                 posts = Post.objects.filter(site=site).order_by('-id')
             rePost = list(posts[0:10])
+            for i in range(0, len(rePost)):
+                rePost[i] = model_to_dict(rePost[i])
+                liked = list(Interactive.objects.filter(postId=rePost[i]['id'], userId=userId, type=1))
+                stared = list(Interactive.objects.filter(postId=rePost[i]['id'], userId=userId, type=3))
+                rePost[i]['liked'] = False
+                rePost[i]['stared'] = False
+                if liked:
+                    rePost[i]['liked'] = True
+                if stared:
+                    rePost[i]['stared'] = True
+                # print(rePost[i])
+                student = model_to_dict(Student.objects.filter(id=rePost[i]['userId']).first())
+                rePost[i]['avatar'] = str(student['avatar'])
+                rePost[i]['currentSchool'] = student['currentSchool']
+                rePost[i]['currentEducation'] = student['currentEducation']
+                rePost[i]['gender'] = student['gender']
+                # print(student)
+            context['postList'] = rePost
+            # print(rePost)
+            return JsonResponse(context)
+        if pType == '1':
+            if lastId:
+                hotValue = int(request.GET.get('hotValue'))
+                lastId = (int(lastId))
+                posts = Post.objects.raw(
+                    'SELECT * from myapp_post WHERE site = %s and hotValue <= %s and id > %s ORDER BY hotValue DESC, id DESC',
+                    [site, hotValue, lastId])
+            else:
+                posts = Post.objects.raw(
+                    'SELECT * from myapp_post WHERE site = %s ORDER BY hotValue DESC, id DESC',
+                    [site])
+                print(posts)
+            rePost = list(posts[0:10])
+            print(rePost)
             for i in range(0, len(rePost)):
                 rePost[i] = model_to_dict(rePost[i])
                 liked = list(Interactive.objects.filter(postId=rePost[i]['id'], userId=userId, type=1))
@@ -685,7 +728,20 @@ def getPostDetail(request):
             'poInfo': ''
         }
         pId = request.GET.get('id')
+        po = Post.objects.get(id=pId)
         userId = request.get_signed_cookie('login_id', default=None, salt='id')
+        before = ""
+        if History.objects.filter(userId=userId, postId=pId):
+            before = History.objects.filter(userId=userId, postId=pId).last()
+        his = History.objects.create(userId=Student.objects.get(id=userId), postId=Post.objects.get(id=pId))
+        if before:
+            sec = (his.viewTime - before.viewTime).seconds
+            if sec > 60 * 60 * 60 * 2:
+                po.hotValue += 1
+                po.save()
+        else:
+            po.hotValue += 1
+            po.save()
         po = model_to_dict(Post.objects.get(id=pId))
         liked = list(Interactive.objects.filter(postId=po['id'], userId=userId, type=1))
         stared = list(Interactive.objects.filter(postId=po['id'], userId=userId, type=3))
@@ -756,7 +812,7 @@ def replayDetail(request):
         userId = request.get_signed_cookie('login_id', default=None, salt='id')
         lastId = request.GET.get('lastId')
         if lastId:
-            replays = list(Comment.objects.raw('SELECT * from myapp_comment WHERE id > %s ORDER BY id', [lastId]))
+            replays = list(Comment.objects.raw('SELECT * from myapp_comment WHERE toComment = %s and postId_id = %s and id > %s ORDER BY id', [toComment, pId, lastId]))
         else:
             replays = list(Comment.objects.filter(toComment=toComment, postId=pId))
         replayList = replays[0:10]
@@ -795,15 +851,19 @@ def like(request):
         if pType == '1':
             Interactive.objects.get(userId=student, postId=post, type=1).delete()
             post.likes -= 1
+            post.hotValue -= 5
         elif pType == '2':
             Interactive.objects.create(userId=student, postId=post, type=1)
             post.likes += 1
+            post.hotValue += 5
         elif pType == '3':
             Interactive.objects.get(userId=student, postId=post, type=3).delete()
             post.stars -= 1
+            post.hotValue -= 20
         elif pType == '4':
             Interactive.objects.create(userId=student, postId=post, type=3)
             post.stars += 1
+            post.hotValue += 20
         post.save()
         return JsonResponse(commonRes)
 
@@ -816,6 +876,7 @@ def comment(request):
         pId = req.get('id')
         po = Post.objects.get(id=pId)
         po.comments += 1
+        po.hotValue += 10
         po.save()
         content = req.get('content')
         cType = req.get('type')
@@ -1069,6 +1130,67 @@ def getCollectionList(request):
             # print(student)
             reList.append(po)
         context['postList'] = reList
+        # print(rePost)
+        return JsonResponse(context)
+
+
+# 获取关注列表动态
+def followPostList(request):
+    if request.method == "POST":
+        context = {
+            'code': 200,
+            'result': '获取列表成功',
+            'postList': [],
+            'success': True
+        }
+        req = eval(request.body.decode())
+        userId = request.get_signed_cookie('login_id', default=None, salt='id')
+        s = Student.objects.get(id=userId)
+        s.unReadPost = 0
+        s.save()
+        starList = s.starList
+        inStr1 = ""
+        for i in eval(starList):
+            inStr1 = inStr1 + str(i) + ","
+        inStr1 = inStr1[:-1]
+        if not inStr1:
+            context['code'] = 210
+            context['result'] = "用户还没有关注列表"
+            context['success'] = True
+            return JsonResponse(context)
+        lastId = req.get('lastId')
+        siteList = req.get('siteList')
+        inStr = ""
+        for i in siteList:
+            inStr = inStr + str(i) + ","
+        inStr = inStr[:-1]
+        print(siteList)
+        print(eval(starList))
+        if lastId:
+            lastId = (int(lastId))
+            posts = Post.objects.raw('SELECT * from myapp_post WHERE userId_id in ( %s ) and id < %s and site in ( %s ) ORDER BY id DESC', [inStr1, lastId, inStr])
+            print(posts)
+        else:
+            posts = Post.objects.filter(site__in=siteList, userId__in=eval(starList)).order_by('-id')
+        rePost = list(posts[0:10])
+        for i in range(0, len(rePost)):
+            rePost[i] = model_to_dict(rePost[i])
+            liked = list(Interactive.objects.filter(postId=rePost[i]['id'], userId=userId, type=1))
+            stared = list(Interactive.objects.filter(postId=rePost[i]['id'], userId=userId, type=3))
+            rePost[i]['liked'] = False
+            rePost[i]['stared'] = False
+            if liked:
+                rePost[i]['liked'] = True
+            if stared:
+                rePost[i]['stared'] = True
+            # print(rePost[i])
+            student = model_to_dict(Student.objects.filter(id=rePost[i]['userId']).first())
+            rePost[i]['avatar'] = str(student['avatar'])
+            rePost[i]['currentSchool'] = student['currentSchool']
+            rePost[i]['currentEducation'] = student['currentEducation']
+            rePost[i]['gender'] = student['gender']
+            # print(student)
+        context['postList'] = rePost
         # print(rePost)
         return JsonResponse(context)
 

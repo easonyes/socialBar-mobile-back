@@ -39,6 +39,7 @@ class Student(models.Model):
     starList = models.TextField(verbose_name="关注列表", default=[])
     fansList = models.TextField(verbose_name="粉丝列表", default=[])
     avatar = models.FileField(verbose_name="用户头像", upload_to="img/avatars", default="/media/img/avatars/default.jpg")
+    unReadPost = models.IntegerField(verbose_name="未读动态", default=0)
 
 
 # 邮箱验证
@@ -95,13 +96,14 @@ class Post(models.Model):
     forwards = models.IntegerField(verbose_name="转发数", default=0)
     imgs = models.TextField(verbose_name="图片", null=True)
     site = models.IntegerField(verbose_name="发布站点", default=1)
+    hotValue = models.IntegerField(verbose_name="热点值", default=1000)
 
 
 # 浏览历史表
 class History(models.Model):
     userId = models.ForeignKey(Student, on_delete=models.CASCADE, verbose_name="学生id")
     postId = models.ForeignKey(Post, on_delete=models.CASCADE, verbose_name="动态id")
-    viewTime = models.DateField(verbose_name="浏览时间")
+    viewTime = models.DateTimeField(verbose_name="浏览时间", default=timezone.now())
 
 
 # 互动表
