@@ -96,7 +96,7 @@ class Post(models.Model):
     forwards = models.IntegerField(verbose_name="转发数", default=0)
     imgs = models.TextField(verbose_name="图片", null=True)
     site = models.IntegerField(verbose_name="发布站点", default=1)
-    hotValue = models.IntegerField(verbose_name="热点值", default=1000)
+    hotValue = models.IntegerField(verbose_name="热点值", default=3000)
 
 
 # 浏览历史表

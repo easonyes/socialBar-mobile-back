@@ -19,6 +19,7 @@ import os
 import re
 from asgiref.sync import async_to_sync, sync_to_async
 from channels.layers import get_channel_layer
+from django.db import connection
 
 
 # Create your views here.
@@ -685,11 +686,11 @@ def postList(request):
                 hotValue = int(request.GET.get('hotValue'))
                 lastId = (int(lastId))
                 posts = Post.objects.raw(
-                    'SELECT * from myapp_post WHERE site = %s and hotValue <= %s and id > %s ORDER BY hotValue DESC, id DESC',
+                    'SELECT * from myapp_post WHERE site = %s and hotValue > 0 and hotValue <= %s and id < %s ORDER BY hotValue DESC, id DESC',
                     [site, hotValue, lastId])
             else:
                 posts = Post.objects.raw(
-                    'SELECT * from myapp_post WHERE site = %s ORDER BY hotValue DESC, id DESC',
+                    'SELECT * from myapp_post WHERE site = %s and hotValue > 0 ORDER BY hotValue DESC, id DESC',
                     [site])
                 print(posts)
             rePost = list(posts[0:10])
@@ -1173,6 +1174,7 @@ def followPostList(request):
         else:
             posts = Post.objects.filter(site__in=siteList, userId__in=eval(starList)).order_by('-id')
         rePost = list(posts[0:10])
+        print(rePost)
         for i in range(0, len(rePost)):
             rePost[i] = model_to_dict(rePost[i])
             liked = list(Interactive.objects.filter(postId=rePost[i]['id'], userId=userId, type=1))
@@ -1195,4 +1197,66 @@ def followPostList(request):
         return JsonResponse(context)
 
 
+def dictfetchall(cursor):
+    "从cursor获取所有行数据转换成一个字典"
+    columns = [col[0] for col in cursor.description]
+    return [
+        dict(zip(columns, row))
+        for row in cursor.fetchall()
+    ]
+
+
 # 搜索列表及用户
+def searchInfo(request):
+    if request.method == "POST":
+        context = {
+            'code': 200,
+            'result': '获取列表成功',
+            'list': [],
+            'success': True
+        }
+        req = eval(request.body.decode())
+        userId = request.get_signed_cookie('login_id', default=None, salt='id')
+        info = req.get('info')
+        length = req.get('length')
+        qType = req.get('type')
+        print(type(qType))
+        if qType == 1:
+            siteList = req.get('siteList')
+            inStr = ""
+            for i in siteList:
+                inStr = inStr + str(i) + ","
+            inStr = inStr[:-1]
+            cursor = connection.cursor()
+            cursor.execute('SELECT * from myapp_post WHERE site in ( %s ) and content like "%%%s%%" ORDER BY length(content), id' %
+                           (inStr, info))
+            posts = dictfetchall(cursor)
+            rePost = list(posts[length*10-10:length*10])
+            for i in range(0, len(rePost)):
+                print(rePost[i])
+                liked = list(Interactive.objects.filter(postId=rePost[i]['id'], userId=userId, type=1))
+                stared = list(Interactive.objects.filter(postId=rePost[i]['id'], userId=userId, type=3))
+                rePost[i]['liked'] = False
+                rePost[i]['stared'] = False
+                if liked:
+                    rePost[i]['liked'] = True
+                if stared:
+                    rePost[i]['stared'] = True
+                # print(rePost[i])
+                student = model_to_dict(Student.objects.filter(id=rePost[i]['userId_id']).first())
+                rePost[i]['avatar'] = str(student['avatar'])
+                rePost[i]['currentSchool'] = student['currentSchool']
+                rePost[i]['currentEducation'] = student['currentEducation']
+                rePost[i]['gender'] = student['gender']
+                # print(student)
+            context['list'] = rePost
+        if qType == 2:
+            cursor = connection.cursor()
+            cursor.execute(
+                'SELECT * from myapp_student WHERE nickName like "%%%s%%" ORDER BY length(nickName), id' % info)
+            users = dictfetchall(cursor)
+            reUsers = list(users[length * 10 - 10:length * 10])
+            for i in reUsers:
+                print(i)
+            context['list'] = reUsers
+        return JsonResponse(context)
